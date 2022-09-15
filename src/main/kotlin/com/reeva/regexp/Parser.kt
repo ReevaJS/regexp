@@ -322,7 +322,7 @@ class Parser(private val codepoints: IntArray, private val unicode: Boolean) {
             return false
 
         for ((i, cp) in codepoints.withIndex()) {
-            if (this.codepoints[cursor + i] != codepoints[i])
+            if (this.codepoints[cursor + i] != cp)
                 return false
         }
 
