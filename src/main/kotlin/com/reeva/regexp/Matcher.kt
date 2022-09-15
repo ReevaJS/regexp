@@ -218,26 +218,26 @@ class Matcher(private val source: IntArray, private val opcodes: List<Opcode>) {
     ) {
         fun copy() = GroupState(key, content.toMutableList())
     }
+
+    private val MatchState.codepoint: Int
+        inline get() = source[sourceCursor]
+
+    private val MatchState.op: Opcode
+        inline get() = opcodes[opcodeCursor]
+
+    private fun MatchState.advanceSource() {
+        groups.forEach {
+            it.content.add(source[sourceCursor])
+        }
+        sourceCursor++
+    }
     
-    private inner class MatchState(
+    private class MatchState(
         var sourceCursor: Int,
         var opcodeCursor: Int,
         val groups: MutableList<GroupState> = mutableListOf(),
         val groupContents: MutableMap<Any /* Int | String */, IntArray> = mutableMapOf(),
     ) {
-        val codepoint: Int
-            inline get() = source[sourceCursor]
-
-        val op: Opcode
-            inline get() = opcodes[opcodeCursor]
-
-        fun advanceSource() {
-            groups.forEach {
-                it.content.add(source[sourceCursor])
-            }
-            sourceCursor++
-        }
-
         fun advanceOp() {
             opcodeCursor++
         }
