@@ -19,13 +19,7 @@ fun main() {
      *   ^
      */
 
-    val opcodes = Parser(REGEX, unicode = false).parse()
-
-    opcodes.forEach {
-        println(it)
-    }
-
-    val result = Matcher(STRING.codePoints().toArray(), opcodes).match()
+    val result = RegExp(REGEX, RegExp.Flag.Unicode).match(STRING)
 
     println(result)
 }
