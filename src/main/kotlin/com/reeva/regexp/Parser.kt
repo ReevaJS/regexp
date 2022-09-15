@@ -30,23 +30,25 @@ class Parser(private val codepoints: IntArray, private val unicode: Boolean) {
 
     private fun parseSingle() {
         parsePrimary()
-        parseSecondary()
+
+        if (!done)
+            parseSecondary()
     }
 
     private fun parsePrimary() {
         when (codepoint) {
             0x28 /* ( */ -> {
                 cursor++
+
+                state.modifierMark = builder.mark()
                 states.add(State())
 
                 +StartGroupOp(nextGroupIndex++)
 
-
                 while (!done && codepoint != 0x29 /* ) */)
                     parseSingle()
 
-                if (codepoint != 0x29 /* ) */)
-                    error("Expected ')'")
+                if (codepoint != 0x29 /* ) */) error("Expected ')'")
 
                 states.removeLast()
 
@@ -55,10 +57,66 @@ class Parser(private val codepoints: IntArray, private val unicode: Boolean) {
             }
             0x5b /* [ */ -> {
                 cursor++
-                TODO()
+                state.modifierMark = builder.mark()
+
+                val ops = mutableListOf<Opcode>()
+
+                if (codepoint == 0x5e /* ^ */) {
+                    cursor++
+                    +NegateNextOp
+                }
+
+                while (!done && codepoint != 0x5d /* ] */) {
+                    if (codepoint == 0x5c /* \ */)
+                        TODO()
+
+                    val start = codepoint
+                    cursor++
+
+                    if (!done && codepoint == 0x2d /* - */ && peek(1) != 0x5d /* ] */) {
+                        cursor++
+                        val end = codepoint
+
+                        if (start > end)
+                            error("Character class range is out-of-order")
+
+                        ops.add(CharRangeOp(start, end))
+                    } else {
+                        ops.add(CharOp(start))
+                    }
+                }
+
+                if (codepoint != 0x5d /* ] */)
+                    error("Expected closing ']'")
+
+                cursor++
+
+                +CharClassOp(ops.size)
+                ops.forEach { +it }
             }
             0x5c /* \ */ -> parseEscape(inCharClass = false)
-            else -> TODO()
+            0x5e /* ^ */ -> {
+                cursor++
+                state.modifierMark = builder.mark()
+                +StartOp
+            }
+            0x24 /* $ */ -> {
+                cursor++
+                state.modifierMark = builder.mark()
+                +EndOp
+            }
+            0x2e /* . */ -> {
+                cursor++
+                state.modifierMark = builder.mark()
+                +AnyOp
+            }
+            else -> {
+                if (codepoint in charsThatRequireEscape)
+                    error("Unescaped \"${codepoint.toChar()}\"")
+
+                state.modifierMark = builder.mark()
+                +CharOp(codepoint).also { cursor++ }
+            }
         }
     }
 
@@ -129,55 +187,54 @@ class Parser(private val codepoints: IntArray, private val unicode: Boolean) {
         when (codepoint) {
             0x3f /* ? */ -> {
                 cursor++
+                val lazy = consumeIf(0x3f /* ? */)
 
                 /*
-                 * Fork X+1
+                 * Fork/ForkNow X+1
                  * <X opcodes>
                  */
 
                 val modifierMark = state.modifierMark
                 val numTargetOpcodes = builder.size - modifierMark.offset
 
-                modifierMark.insertBefore(Fork(numTargetOpcodes + 1))
-
-                if (codepoint == 0x3f /* ? */)
-                    TODO()
+                val op = if (lazy) ::ForkNow else ::Fork
+                modifierMark.insertBefore(op(numTargetOpcodes + 1))
 
                 state.modifierMark = builder.mark()
             }
             0x2a /* * */ -> {
                 cursor++
+                val lazy = consumeIf(0x3f /* ? */)
 
                 /*
-                 * Fork X+1
+                 * Fork/ForkNow X+1
                  * <X opcodes>
-                 * Fork -X
+                 * ForkNow/Fork -X
                  */
 
                 val modifierMark = state.modifierMark
                 val numTargetOpcodes = builder.size - modifierMark.offset
 
-                modifierMark.insertBefore(Fork(numTargetOpcodes + 1))
-                +Fork(-numTargetOpcodes)
+                val firstOp = if (lazy) ::ForkNow else ::Fork
+                val secondOp = if (lazy) ::Fork else ::ForkNow
 
-                if (codepoint == 0x3f /* ? */)
-                    TODO()
+                modifierMark.insertBefore(firstOp(numTargetOpcodes + 1))
+                +secondOp(-numTargetOpcodes)
 
                 state.modifierMark = builder.mark()
             }
             0x2b /* + */ -> {
                 cursor++
+                val lazy = consumeIf(0x3f /* ? */)
 
                 /*
                  * <X opcodes>
-                 * Fork -X
+                 * Fork/ForkNow -X
                  */
 
                 val numTargetOpcodes = builder.size - state.modifierMark.offset
-                +Fork(-numTargetOpcodes)
-
-                if (codepoint == 0x3f /* ? */)
-                    TODO()
+                val op = if (lazy) ::Fork else ::ForkNow
+                +op(-numTargetOpcodes)
 
                 state.modifierMark = builder.mark()
             }
@@ -185,25 +242,22 @@ class Parser(private val codepoints: IntArray, private val unicode: Boolean) {
                 cursor++
 
                 /*
-
-                ab|cd
-
-
-                Char a
-                Char b
-
-
-
-                Fork +4
-                Char a
-                Char b
-                Jump +3
-                Char c
-                Char d
-                <end>
-
+                 *
+                 * Fork X+2
+                 * <X opcodes>
+                 * Jump Y+1
+                 * <Y opcodes>
+                 *
                  */
+
+                val alternationMark = state.alternationMark
+                val numTargetOpcodes = builder.size - alternationMark.offset
+
+                alternationMark.insertBefore(Fork(numTargetOpcodes + 2)) // Skip the jump
+                +Jump(numTargetOpcodes + 1)
+                state.alternationMark = builder.mark()
             }
+            else -> return
         }
     }
 
@@ -214,7 +268,7 @@ class Parser(private val codepoints: IntArray, private val unicode: Boolean) {
         var numChars = 0
 
         while (!done && numChars < max) {
-            if (codepoint in 0x30..0x39 /* 0-9 */ ) {
+            if (codepoint in 0x30..0x39 /* 0-9 */) {
                 value = (value shl 4) or (codepoint - 0x30)
                 numChars++
                 cursor++
@@ -227,6 +281,15 @@ class Parser(private val codepoints: IntArray, private val unicode: Boolean) {
         return value
     }
 
+    private fun consumeIf(codepoint: Int): Boolean {
+        return if (!done && this.codepoint == codepoint) {
+            cursor++
+            true
+        } else false
+    }
+
+    private fun peek(n: Int): Int? = codepoints.getOrNull(cursor + n)
+
     private fun error(message: String): Nothing = throw RegexSyntaxError(message, cursor)
 
     private operator fun Opcode.unaryPlus() = builder.addOpcode(this)
@@ -235,4 +298,10 @@ class Parser(private val codepoints: IntArray, private val unicode: Boolean) {
         var alternationMark: OpcodeBuilder.Mark = builder.mark(),
         var modifierMark: OpcodeBuilder.Mark = builder.mark(),
     )
+
+    companion object {
+        private val charsThatRequireEscape = setOf(
+            '*', '?', '(', ')', '[', '/'
+        ).map(Char::code)
+    }
 }
