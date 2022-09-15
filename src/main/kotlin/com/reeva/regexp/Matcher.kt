@@ -5,12 +5,24 @@ data class MatchResult(
     val namedGroups: Map<String, String>,
 )
 
-class Matcher(private val source: IntArray, private val opcodes: List<Opcode>) {
+class Matcher(private val source: IntArray, private val opcodes: Array<Opcode>) {
     private val pendingStates = mutableListOf<MatchState>()
-    private var shouldNegateNext = false
+    
+    fun match(startIndex: Int = 0): MatchResult? {
+        pendingStates.clear()
 
-    fun match(): MatchResult? {
-        return exec(MatchState(0, 0))
+        // Common-case optimization: Don't check the entire string if regex starts with
+        // a StartOp (it will be the second op, since the first is always StartGroupOp(0))
+
+        if (opcodes[1] == StartOp)
+            return if (startIndex != 0) null else exec(MatchState(0, 0))
+
+        var sourceIndex = startIndex
+
+        while (sourceIndex < source.size)
+            exec(MatchState(sourceIndex++, 0))?.let { return it }
+
+        return null
     }
 
     private fun exec(initialState: MatchState): MatchResult? {
@@ -19,17 +31,12 @@ class Matcher(private val source: IntArray, private val opcodes: List<Opcode>) {
         while (true) {
             when (execOp(state)) {
                 ExecResult.Match -> {
-                    // We shouldn't be able to end the regex inside of a group
-                    expect(state.groups.isEmpty())
-
+                    @Suppress("UNCHECKED_CAST")
                     val indexedGroups = state.groupContents.toList()
                         .filter { it.first is Int }                        
                         .sortedBy { it.first as Int } as List<Pair<Int, IntArray>>
-
-                    indexedGroups.forEachIndexed { index, value ->
-                        expect(index == value.first)
-                    }
-
+                    
+                    @Suppress("UNCHECKED_CAST")
                     val namedGroups = state.groupContents.toList()
                         .filter { it.first is String }
                         .toMap() as Map<String, IntArray>
@@ -195,6 +202,44 @@ class Matcher(private val source: IntArray, private val opcodes: List<Opcode>) {
             is Jump -> {
                 state.opcodeCursor += op.offset + 1
                 ExecResult.Continue
+            }
+            is LookOp -> {
+                state.advanceOp()
+
+                var newState = MatchState(state.sourceCursor, 0)
+
+                val matched = if (op.isAhead) {
+                    Matcher(source, op.opcodes).exec(newState) != null
+                } else {
+                    var matched = false
+
+                    // TODO: Determine opcode min/max length here
+                    for (newPos in state.sourceCursor downTo 0) {
+                        newState = MatchState(newPos, 0)
+
+                        if (Matcher(source, op.opcodes).exec(newState) != null && newState.sourceCursor == state.sourceCursor) {
+                            matched = true
+                            break
+                        }
+                    }
+
+                    matched
+                }
+
+                if (op.isPositive != matched) {
+                    ExecResult.Fail
+                } else {
+                    // Save any new capturing groups
+                    for ((key, value) in newState.groupContents) {
+                        if (key == 0) // Skip the implicit group
+                            continue
+
+                        if (key !in state.groupContents)
+                            state.groupContents[key] = value
+                    }
+
+                    ExecResult.Continue
+                }
             }
         }
     }

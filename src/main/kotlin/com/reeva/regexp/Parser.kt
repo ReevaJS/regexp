@@ -1,7 +1,7 @@
 package com.reeva.regexp
 
 class Parser(private val codepoints: IntArray, private val unicode: Boolean) {
-    private val builder = OpcodeBuilder()
+    private var builder = OpcodeBuilder()
     private var nextGroupIndex = 0
     private var cursor = 0
     private val groupNames = mutableSetOf<String>()
@@ -18,7 +18,7 @@ class Parser(private val codepoints: IntArray, private val unicode: Boolean) {
 
     constructor(source: String, unicode: Boolean) : this(source.codePoints().toArray(), unicode)
 
-    fun parse(): List<Opcode> {
+    fun parse(): Array<Opcode> {
         states.add(State())
 
         // The entire match is implicitly group 0
@@ -50,39 +50,60 @@ class Parser(private val codepoints: IntArray, private val unicode: Boolean) {
                 state.modifierMark = builder.mark()
                 states.add(State())
 
-                if (consumeIf(0x3f, 0x3a /* ?: */)) {
-                    +StartGroupOp(null)
-                } else if (consumeIf(0x3f, 0x3c /* ?< */)) {
-                    val nameBuilder = StringBuilder()
+                // TODO: This is very ugly
+                val previousBuilder = builder
+                builder = OpcodeBuilder()
+                var lookOp: ((Array<Opcode>) -> LookOp)? = null
 
-                    while (!done && codepoint != 0x3e /* > */)  {
-                        nameBuilder.appendCodePoint(codepoint)
+                when {
+                    consumeIf(0x3f, 0x3a /* ?: */) -> +StartGroupOp(null)
+                    consumeIf(0x3f, 0x3d /* ?= */) -> lookOp = ::PositiveLookaheadOp
+                    consumeIf(0x3f, 0x21 /* ?! */) -> lookOp = ::NegativeLookaheadOp
+                    consumeIf(0x3f, 0x3c, 0x3d /* ?<= */) -> lookOp = ::PositiveLookbehindOp
+                    consumeIf(0x3f, 0x3c, 0x21 /* ?<! */) -> lookOp = ::NegativeLookbehindOp
+                    consumeIf(0x3f, 0x3c /* ?< */) -> {
+                        val nameBuilder = StringBuilder()
+    
+                        while (!done && codepoint != 0x3e /* > */)  {
+                            nameBuilder.appendCodePoint(codepoint)
+                            cursor++
+                        }
+    
+                        if (codepoint != 0x3e /* > */)
+                            error("Expected '>'")
+    
                         cursor++
+    
+                        val name = nameBuilder.toString()
+                        if (!groupNames.add(name))
+                            error("Duplicate capturing group name \"$name\"")
+    
+                        +StartNamedGroupOp(name)
                     }
-
-                    if (codepoint != 0x3e /* > */)
-                        error("Expected '>'")
-
-                    cursor++
-
-                    val name = nameBuilder.toString()
-                    if (!groupNames.add(name))
-                        error("Duplicate capturing group name \"$name\"")
-
-                    +StartNamedGroupOp(name)
-                } else {
-                    +StartGroupOp(nextGroupIndex)
+                    else -> +StartGroupOp(nextGroupIndex++)
                 }
 
                 while (!done && codepoint != 0x29 /* ) */)
                     parseSingle()
 
-                if (codepoint != 0x29 /* ) */) error("Expected ')'")
+                if (codepoint != 0x29 /* ) */) 
+                    error("Expected ')'")
 
                 states.removeLast()
-
                 cursor++
-                +EndGroupOp
+
+                if (lookOp != null)
+                    +MatchOp
+
+                val ops = builder.build()
+                builder = previousBuilder
+
+                if (lookOp != null) {
+                    +lookOp(ops)
+                } else {
+                    builder.addOpcodes(ops.toList())
+                    +EndGroupOp
+                }
             }
             0x5b /* [ */ -> {
                 cursor++

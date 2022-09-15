@@ -96,3 +96,24 @@ class ForkNow(offset: Int) : OffsetOpcode(offset) {
 class Jump(offset: Int) : OffsetOpcode(offset) {
     override fun toString() = "Jump($offset)"
 }
+
+sealed class LookOp(val opcodes: Array<Opcode>, val isPositive: Boolean, val isAhead: Boolean) : Opcode() {
+    override fun toString() = buildString {
+        append(this@LookOp::class.simpleName!!.replace("Op", ""))
+        append(" [\n")
+        opcodes.forEach { 
+            append("  ")
+            append(it)
+            append('\n')
+        }
+        append("]")
+    }
+}
+
+class PositiveLookaheadOp(opcodes: Array<Opcode>) : LookOp(opcodes, true, true)
+
+class NegativeLookaheadOp(opcodes: Array<Opcode>) : LookOp(opcodes, false, true)
+
+class PositiveLookbehindOp(opcodes: Array<Opcode>) : LookOp(opcodes, true, false)
+
+class NegativeLookbehindOp(opcodes: Array<Opcode>) : LookOp(opcodes, false, false)

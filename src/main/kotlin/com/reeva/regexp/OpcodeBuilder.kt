@@ -9,7 +9,7 @@ internal class OpcodeBuilder {
 
     fun mark(offset: Int = opcodes.size) = marks.getOrPut(offset) { Mark(offset) }
 
-    fun build() = opcodes
+    fun build() = opcodes.toTypedArray()
 
     fun addOpcode(opcode: Opcode) {
         opcodes.add(opcode)
@@ -46,6 +46,10 @@ internal class OpcodeBuilder {
 
         // Add new opcode/mark
         opcodes.add(index, opcode)
+    }
+
+    fun addOpcodes(opcodes: List<Opcode>) {
+        this.opcodes.addAll(opcodes)
     }
 
     inner class Mark(var offset: Int) {
