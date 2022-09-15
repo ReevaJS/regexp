@@ -1,205 +1,238 @@
 package com.reeva.regexp
 
-class Parser(private val source: String) {
+class Parser(private val codepoints: IntArray, private val unicode: Boolean) {
+    private val builder = OpcodeBuilder()
+    private var nextGroupIndex = 0
     private var cursor = 0
 
-    private val char: Char
-        get() = source[cursor]
+    private val states = mutableListOf<State>()
+    private val state: State
+        get() = states.last()
+
+    private val codepoint: Int
+        get() = codepoints[cursor]
 
     private val done: Boolean
-        get() = cursor > source.lastIndex
+        get() = cursor > codepoints.lastIndex
 
-    fun parse(): RootAST {
-        val topLevelASTs = mutableListOf<AST>()
+    constructor(source: String, unicode: Boolean) : this(source.codePoints().toArray(), unicode)
+
+    fun parse(): List<Opcode> {
+        states.add(State())
 
         while (!done)
-            topLevelASTs.add(parseSingle())
+            parseSingle()
 
-        return Optimizer.optimize(RootAST(GroupAST(topLevelASTs))) as RootAST
+        expect(states.size == 1)
+
+        return builder.build()
     }
 
-    private fun parseSingle(): AST {
-        var target = parsePrimary()
-    
-        while (!done)
-            target = parseSecondary(target) ?: return target
-
-        return target
+    private fun parseSingle() {
+        parsePrimary()
+        parseSecondary()
     }
 
-    private fun parsePrimary(): AST {
-        return when (char) {
-            '(' -> {
+    private fun parsePrimary() {
+        when (codepoint) {
+            0x28 /* ( */ -> {
                 cursor++
-                val asts = mutableListOf<AST>()
+                states.add(State())
 
-                while (!done && char != ')')
-                    asts.add(parseSingle())
+                +StartGroupOp(nextGroupIndex++)
 
-                if (char != ')')
-                    throw IllegalStateException("Expected ')'")
+
+                while (!done && codepoint != 0x29 /* ) */)
+                    parseSingle()
+
+                if (codepoint != 0x29 /* ) */)
+                    error("Expected ')'")
+
+                states.removeLast()
 
                 cursor++
-
-                GroupAST(asts)
+                +EndGroupOp
             }
-            '[' -> {
+            0x5b /* [ */ -> {
+                cursor++
+                TODO()
+            }
+            0x5c /* \ */ -> parseEscape(inCharClass = false)
+            else -> TODO()
+        }
+    }
+
+    private fun parseEscape(inCharClass: Boolean) {
+        cursor++
+        if (done)
+            error("RegExp cannot end with a backslash")
+
+        state.modifierMark = builder.mark()
+
+        when (codepoint) {
+            0x74 /* t */ -> +CharOp(0x9)
+            0x6e /* n */ -> +CharOp(0xa)
+            0x76 /* v */ -> +CharOp(0xb)
+            0x73 /* s */ -> +WhitespaceOp
+            0x53 /* S */ -> {
+                +NegateNextOp
+                +WhitespaceOp
+            }
+            0x62 /* b */ -> if (inCharClass) {
+                +CharOp(0x8 /* <backspace> */)
+            } else +WordBoundaryOp
+            0x42 /* B */ -> {
+                +NegateNextOp
+                +WordBoundaryOp
+            }
+            0x64 /* d */ -> +DigitOp
+            0x44 /* D */ -> {
+                +NegateNextOp
+                +DigitOp
+            }
+            0x77 /* w */ -> +WordOp
+            0x57 /* W */ -> {
+                +NegateNextOp
+                +WordOp
+            }
+            in 0x30..0x39 /* 1-9 */ -> +BackReferenceOp(codepoint - 0x30)
+            0x75 /* u */ -> {
                 cursor++
 
-                val inverted = consumeIf('^')
-                val ranges = mutableListOf<CharacterRange>()
-
-                while (!done && char != ']') {
-                    if (char == '\\')
-                        TODO()
-
-                    val start = char
+                val codepoint = if (unicode && codepoint == 0x7b /* { */) {
                     cursor++
+                    val v = parseHexValue(1, 6)
+                    if (codepoint != 0x7d /* } */)
+                        error("Expected '}' to close unicode escape sequence")
 
-                    val end = if (!done && char == '-' && peek(1) != ']') {
-                        cursor++
-                        char.also { cursor++ }
-                    } else start
+                    v
+                } else parseHexValue(4, 4)
 
-                    if (start > end)
-                        throw IllegalStateException("Range is out-of-order")
+                if (codepoint >= 0x10ffff)
+                    error("Codepoint ${codepoint.toString(radix = 16)} is too large")
 
-                    ranges.add(CharacterRange(start, end))
-                }
-
-                if (char != ']')
-                    throw IllegalStateException("Expected ']'")
-
+                +CharOp(codepoint)
+            }
+            0x78 /* x */ -> {
                 cursor++
-
-                CharacterClassAST(ranges, inverted)
+                +CharOp(parseHexValue(2, 2))
             }
-            '^' -> {
-                cursor++
-                StartAST
-            }
-            '$' -> {
-                cursor++
-                EndAST
-            }
-            '\\' -> parseEscape(inCharClass = false)
-            '.' -> {
-                cursor++
-                AnyAST
-            }
-            else -> {
-                if (char in charsThatRequireEscape)
-                    throw IllegalStateException("Character requires escape: '$char'")
-
-                CharAST(char).also { cursor++ }
-            }
+            0x70, 0x50 /* p, P */ -> TODO()
+            0x6b /* k */ -> TODO()
+            else -> +CharOp(codepoint)
         }
-    }
-
-    private fun parseSecondary(target: AST): AST? {
-        return when (char) {
-            '*' -> {
-                cursor++
-                RepetitionRangeAST(target, 0, null, consumeIf('?'))
-            }
-            '+' -> {
-                cursor++
-                RepetitionRangeAST(target, 1, null, consumeIf('?'))
-            }
-            '{' -> {
-                cursor++
-
-                val lowerBound = buildString {
-                    while (!done && char.isDigit()) {
-                        append(char)
-                        cursor++
-                    }
-                }.toInt()
-
-                when (char) {
-                    '}' -> {
-                        cursor++
-                        consumeIf('?') // This doesn't do anything, but it is valid
-                        RepetitionAST(target, lowerBound)
-                    }
-                    ',' -> {
-                        cursor++
-                        if (char == '}') {
-                            cursor++
-                            RepetitionRangeAST(target, lowerBound, null, consumeIf('?'))
-                        } else {
-                            val upperBound = buildString {
-                                while (!done && char.isDigit()) {
-                                    append(char)
-                                    cursor++
-                                }
-                            }.toInt()
-
-                            if (char != '}')
-                                throw IllegalStateException("Expected '}'")
-
-                            cursor++
-
-                            RepetitionRangeAST(target, lowerBound, upperBound, consumeIf('?'))
-                        }
-                    }
-                    else -> throw IllegalStateException("Unexpected char in range: '$char'")
-                }
-            }
-            '?' -> {
-                cursor++
-                RepetitionRangeAST(target, 0, 1, consumeIf('?'))
-            }
-            '|' -> {
-                cursor++
-                AlternationAST(listOf(target, parseSingle()))
-            }
-            else -> null
-        }
-    }
-
-    private fun parseEscape(inCharClass: Boolean): AST {
-        if (char != '\\')
-            throw IllegalStateException()
 
         cursor++
-
-        if (done)
-            throw IllegalStateException("RegExp cannot end with '\\'")
-
-        return when (char) {
-            'n' -> CharAST('\n')
-            't' -> CharAST('\t')
-            'v' -> CharAST(11.toChar())
-            '.' -> CharAST('.')
-            'b' -> if (inCharClass) {
-                CharAST('\b')
-            } else WordBoundaryAST(inverted = false)
-            'B' -> WordBoundaryAST(inverted = true)
-            's' -> WhitespaceAST(inverted = false)
-            'S' -> WhitespaceAST(inverted = true)
-            'd' -> DigitAST(inverted = false)
-            'D' -> DigitAST(inverted = true)
-            'w' -> WordAST(inverted = false)
-            'W' -> WordAST(inverted = true)
-            else -> CharAST(char)
-        }.also { cursor++ }
     }
 
-    private fun consumeIf(char: Char): Boolean {
-        return if (!done && this.char == char) {
-            cursor++
-            true
-        } else false
+    private fun parseSecondary() {
+        when (codepoint) {
+            0x3f /* ? */ -> {
+                cursor++
+
+                /*
+                 * Fork X+1
+                 * <X opcodes>
+                 */
+
+                val modifierMark = state.modifierMark
+                val numTargetOpcodes = builder.size - modifierMark.offset
+
+                modifierMark.insertBefore(Fork(numTargetOpcodes + 1))
+
+                if (codepoint == 0x3f /* ? */)
+                    TODO()
+
+                state.modifierMark = builder.mark()
+            }
+            0x2a /* * */ -> {
+                cursor++
+
+                /*
+                 * Fork X+1
+                 * <X opcodes>
+                 * Fork -X
+                 */
+
+                val modifierMark = state.modifierMark
+                val numTargetOpcodes = builder.size - modifierMark.offset
+
+                modifierMark.insertBefore(Fork(numTargetOpcodes + 1))
+                +Fork(-numTargetOpcodes)
+
+                if (codepoint == 0x3f /* ? */)
+                    TODO()
+
+                state.modifierMark = builder.mark()
+            }
+            0x2b /* + */ -> {
+                cursor++
+
+                /*
+                 * <X opcodes>
+                 * Fork -X
+                 */
+
+                val numTargetOpcodes = builder.size - state.modifierMark.offset
+                +Fork(-numTargetOpcodes)
+
+                if (codepoint == 0x3f /* ? */)
+                    TODO()
+
+                state.modifierMark = builder.mark()
+            }
+            0x7c /* | */ -> {
+                cursor++
+
+                /*
+
+                ab|cd
+
+
+                Char a
+                Char b
+
+
+
+                Fork +4
+                Char a
+                Char b
+                Jump +3
+                Char c
+                Char d
+                <end>
+
+                 */
+            }
+        }
     }
 
-    private fun peek(n: Int): Char? {
-        return source.getOrNull(cursor + n)
+    private fun parseHexValue(min: Int, max: Int): Int {
+        expect(min >= 0 && max <= 8)
+
+        var value = 0
+        var numChars = 0
+
+        while (!done && numChars < max) {
+            if (codepoint in 0x30..0x39 /* 0-9 */ ) {
+                value = (value shl 4) or (codepoint - 0x30)
+                numChars++
+                cursor++
+            } else break
+        }
+
+        if (numChars !in min..max)
+            error("Expected $min-$max hexadecimal characters")
+
+        return value
     }
 
-    companion object {
-        private val charsThatRequireEscape = setOf(
-            '*', '?', '(', ')', '[', '/'
-        )
-    }
+    private fun error(message: String): Nothing = throw RegexSyntaxError(message, cursor)
+
+    private operator fun Opcode.unaryPlus() = builder.addOpcode(this)
+
+    private inner class State(
+        var alternationMark: OpcodeBuilder.Mark = builder.mark(),
+        var modifierMark: OpcodeBuilder.Mark = builder.mark(),
+    )
 }

@@ -1,6 +1,6 @@
 package com.reeva.regexp
 
-object Optimizer {
+object ASTOptimizer {
     fun optimize(ast: AST): AST {
         return when (ast) {
             is RootAST -> RootAST(optimize(ast.group) as GroupAST)

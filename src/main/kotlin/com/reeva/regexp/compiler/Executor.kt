@@ -1,5 +1,6 @@
 package com.reeva.regexp.compiler
 
+import com.reeva.regexp.RegExpState
 import java.util.LinkedList
 
 class Executor(private val start: Node, private val end: Node) {
@@ -22,8 +23,8 @@ class Executor(private val start: Node, private val end: Node) {
                     return false
                 }
 
-                val history = this.history.popLast()
-                history.node.transitions[history.transitionIndex].transitionBackward(state)
+                val history = this.history.pop()
+                history.node.transitions[history.transitionIndex].first.transitionBackward(state)
                 activeNode = history.node
                 activeTransitionIndex = history.transitionIndex + 1
 

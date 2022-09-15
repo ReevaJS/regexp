@@ -1,6 +1,11 @@
 package com.reeva.regexp
 
+import com.reeva.regexp.compiler.Executor
+import com.reeva.regexp.compiler.convertToNodes
+
 fun main() {
-    val ast = Parser("abc{4,}d*?(ef)[g-i]{1,3}").parse()
+    val ast = Parser("a*aab").parse()
+    val (start, end) = ast.convertToNodes()
+    val result = Executor(start, end).execute("aaaaaaab")
     println(ast)
 }
