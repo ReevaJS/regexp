@@ -22,7 +22,7 @@ class Matcher(private val source: IntArray, private val opcodes: List<Opcode>) {
                     // We shouldn't be able to end the regex inside of a group
                     expect(state.groups.isEmpty())
 
-                    val groupsList = state.groupContents.toList()
+                    val groupsList = state.groupContents.toList().sortedBy { it.first }
                     groupsList.forEachIndexed { index, value ->
                         expect(index == value.first)
                     }
@@ -216,7 +216,10 @@ class Matcher(private val source: IntArray, private val opcodes: List<Opcode>) {
             inline get() = opcodes[opcodeCursor]
 
         fun advanceSource() {
-            groups.lastOrNull()?.content?.add(source[sourceCursor++])
+            groups.forEach {
+                it.content.add(source[sourceCursor])
+            }
+            sourceCursor++
         }
 
         fun advanceOp() {
