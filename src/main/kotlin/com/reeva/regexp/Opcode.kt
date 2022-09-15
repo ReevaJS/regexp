@@ -6,50 +6,50 @@ sealed class Opcode
 // save any space (all integer types except Long are reduced to Int on the JVM)
 class CharOp(val codepoint: Int) : Opcode() {
     override fun toString() = if (codepoint < Char.MAX_VALUE.code) {
-        "CharOp(${codepoint.toChar()})"
-    } else "CharOp($codepoint)"
+        "Char(${codepoint.toChar()})"
+    } else "Char($codepoint)"
 }
 
 class CharClassOp(val numEntries: Int) : Opcode() {
-    override fun toString() = "CharClassOp($numEntries)"
+    override fun toString() = "CharClass($numEntries)"
 }
 
 // Used for character classes
 class CharRangeOp(val start: Int, val end: Int) : Opcode()  {
-    override fun toString() = "CharRangeOp($start-$end)"
+    override fun toString() = "CharRange($start-$end)"
 }
 
 // Null indicates non-capturing group
 class StartGroupOp(val index: Int?) : Opcode() {
-    override fun toString() = "StartGroupOp($index)"
+    override fun toString() = "StartGroup($index)"
 }
 
 class StartNamedGroupOp(val name: String) : Opcode() {
-    override fun toString() = "StartNamedGroupOp($name)"
+    override fun toString() = "StartNamedGroup($name)"
 }
 
 object EndGroupOp : Opcode() {
-    override fun toString() = "EndGroupOp"
+    override fun toString() = "EndGroup"
 }
 
 object NegateNextOp : Opcode() {
-    override fun toString() = "NegateNextOp"
+    override fun toString() = "NegateNext"
 }
 
 object WordOp : Opcode() {
-    override fun toString() = "WordOp"
+    override fun toString() = "Word"
 }
 
 object WordBoundaryOp : Opcode() {
-    override fun toString() = "WordBoundaryOp"
+    override fun toString() = "WordBoundary"
 }
 
 object DigitOp : Opcode() {
-    override fun toString() = "DigitOp"
+    override fun toString() = "Digit"
 }
 
 object WhitespaceOp : Opcode() {
-    override fun toString() = "WhitespaceOp"
+    override fun toString() = "Whitespace"
 }
 
 data class BackReferenceOp(val index: Int) : Opcode() {
@@ -57,20 +57,20 @@ data class BackReferenceOp(val index: Int) : Opcode() {
 }
 
 object StartOp : Opcode() {
-    override fun toString() = "StartOp"
+    override fun toString() = "Start"
 }
 
 object EndOp : Opcode() {
-    override fun toString() = "EndOp"
+    override fun toString() = "End"
 }
 
 object AnyOp : Opcode() {
-    override fun toString() = "AnyOp"
+    override fun toString() = "Any"
 }
 
 // Completes the RegExp match
 object MatchOp : Opcode() {
-    override fun toString() = "MatchOp"
+    override fun toString() = "Match"
 }
 
 ////////////////////
