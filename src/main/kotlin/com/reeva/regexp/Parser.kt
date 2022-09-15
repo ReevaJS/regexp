@@ -169,6 +169,7 @@ class Parser(private val codepoints: IntArray, private val unicode: Boolean) {
                     if (codepoint != 0x7d /* } */)
                         error("Expected '}' to close unicode escape sequence")
 
+                    cursor++
                     v
                 } else parseHexValue(4, 4)
 
@@ -176,10 +177,16 @@ class Parser(private val codepoints: IntArray, private val unicode: Boolean) {
                     error("Codepoint ${codepoint.toString(radix = 16)} is too large")
 
                 +CharOp(codepoint)
+
+                // Negate the cursor increment that comes after this loop
+                cursor--
             }
             0x78 /* x */ -> {
                 cursor++
                 +CharOp(parseHexValue(2, 2))
+
+                // Negate the cursor increment that comes after this loop
+                cursor--
             }
             0x70, 0x50 /* p, P */ -> TODO()
             0x6b /* k */ -> TODO()
