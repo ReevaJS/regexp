@@ -49,7 +49,9 @@ class Parser(private val codepoints: IntArray, private val unicode: Boolean) {
                 state.modifierMark = builder.mark()
                 states.add(State())
 
-                +StartGroupOp(nextGroupIndex++)
+                val nonCapturing = consumeIf(0x3f, 0x3a /* ?: */)
+
+                +StartGroupOp(if (nonCapturing) null else nextGroupIndex++)
 
                 while (!done && codepoint != 0x29 /* ) */)
                     parseSingle()
@@ -294,11 +296,17 @@ class Parser(private val codepoints: IntArray, private val unicode: Boolean) {
         return value
     }
 
-    private fun consumeIf(codepoint: Int): Boolean {
-        return if (!done && this.codepoint == codepoint) {
-            cursor++
-            true
-        } else false
+    private fun consumeIf(vararg codepoints: Int): Boolean {
+        if (cursor + codepoints.size >= this.codepoints.lastIndex)
+            return false
+
+        for ((i, cp) in codepoints.withIndex()) {
+            if (this.codepoints[cursor + i] != codepoints[i])
+                return false
+        }
+
+        cursor += codepoints.size
+        return true
     }
 
     private fun peek(n: Int): Int? = codepoints.getOrNull(cursor + n)

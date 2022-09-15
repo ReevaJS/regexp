@@ -19,7 +19,8 @@ class CharRangeOp(val start: Int, val end: Int) : Opcode()  {
     override fun toString() = "CharRangeOp($start-$end)"
 }
 
-class StartGroupOp(val index: Int) : Opcode() {
+// Null indicates non-capturing group
+class StartGroupOp(val index: Int?) : Opcode() {
     override fun toString() = "StartGroupOp($index)"
 }
 

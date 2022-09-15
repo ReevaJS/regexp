@@ -54,8 +54,10 @@ class Matcher(private val source: IntArray, private val opcodes: List<Opcode>) {
             }
             is EndGroupOp -> {
                 val groupState = state.groups.removeLast()
-                expect(groupState.index !in state.groupContents)
-                state.groupContents[groupState.index] = groupState.content.toIntArray()
+                if (groupState.index != null) {
+                    expect(groupState.index !in state.groupContents)
+                    state.groupContents[groupState.index] = groupState.content.toIntArray()
+                }
                 state.advanceOp()
                 ExecResult.Continue
             }
@@ -197,7 +199,7 @@ class Matcher(private val source: IntArray, private val opcodes: List<Opcode>) {
     }
 
     private data class GroupState(
-        val index: Int,
+        val index: Int?,
         var content: MutableList<Int> = mutableListOf(),
     ) {
         fun copy() = GroupState(index, content.toMutableList())
