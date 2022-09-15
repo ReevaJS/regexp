@@ -1,28 +1,55 @@
 package com.reeva.regexp
 
-data class MatchResult(
-    val groups: List<String>,
-    val namedGroups: Map<String, String>,
-)
+class MatchGroup(
+    val codepoints: IntArray,
+    val range: IntRange,
+) {
+    val value = buildString {
+        codepoints.forEach(::appendCodePoint)
+    }
 
-class Matcher(private val source: IntArray, private val opcodes: Array<Opcode>) {
+    fun copy() = MatchGroup(codepoints.copyOf(), range)
+
+    override fun toString() = "MatchGroup(\"$value\", range=$range)"
+}
+
+data class MatchResult(
+    val groups: List<MatchGroup>,
+    val namedGroups: Map<String, MatchGroup>,
+) {
+    val groupValues: List<String>
+        get() = groups.map { it.value }
+}
+
+class Matcher(
+    private val source: IntArray, 
+    private val opcodes: Array<Opcode>,
+    private val flags: Set<RegExp.Flag>,
+) {
     private val pendingStates = mutableListOf<MatchState>()
     
-    fun match(startIndex: Int = 0): MatchResult? {
+    fun match(startIndex: Int = 0): List<MatchResult>? {
         pendingStates.clear()
 
         // Common-case optimization: Don't check the entire string if regex starts with
         // a StartOp (it will be the second op, since the first is always StartGroupOp(0))
 
         if (opcodes[1] == StartOp)
-            return if (startIndex != 0) null else exec(MatchState(0, 0))
+            return if (startIndex != 0) null else exec(MatchState(0, 0))?.let(::listOf)
 
         var sourceIndex = startIndex
+        val results = mutableListOf<MatchResult>()
 
-        while (sourceIndex < source.size)
-            exec(MatchState(sourceIndex++, 0))?.let { return it }
+        while (sourceIndex < source.size) {
+            val result = exec(MatchState(sourceIndex++, 0))
+            if (result != null) {
+                results.add(result)
+                if (RegExp.Flag.Single in flags)
+                    return results
+            }
+        }
 
-        return null
+        return if (results.isEmpty()) null else results
     }
 
     private fun exec(initialState: MatchState): MatchResult? {
@@ -34,21 +61,15 @@ class Matcher(private val source: IntArray, private val opcodes: Array<Opcode>) 
                     @Suppress("UNCHECKED_CAST")
                     val indexedGroups = state.groupContents.toList()
                         .filter { it.first is Int }                        
-                        .sortedBy { it.first as Int } as List<Pair<Int, IntArray>>
+                        .sortedBy { it.first as Int }
+                        .map { it.second }
                     
                     @Suppress("UNCHECKED_CAST")
                     val namedGroups = state.groupContents.toList()
                         .filter { it.first is String }
-                        .toMap() as Map<String, IntArray>
+                        .toMap() as Map<String, MatchGroup>
 
-                    return MatchResult(
-                        groups = indexedGroups.map { (_, groupCPs) ->
-                            buildString { groupCPs.forEach(::appendCodePoint) }
-                        },
-                        namedGroups = namedGroups.mapValues { (_, groupCPs) ->
-                            buildString { groupCPs.forEach(::appendCodePoint) }
-                        },
-                    )
+                    return MatchResult(indexedGroups, namedGroups)
                 }
                 ExecResult.Continue -> {}
                 ExecResult.Fail -> {
@@ -64,12 +85,12 @@ class Matcher(private val source: IntArray, private val opcodes: Array<Opcode>) 
         println("State: $state, op: $op")
         return when (op) {
             is StartGroupOp -> {
-                state.groups.add(GroupState(op.index))
+                state.groups.add(GroupState(op.index, state.sourceCursor))
                 state.advanceOp()
                 ExecResult.Continue
             }
             is StartNamedGroupOp -> {
-                state.groups.add(GroupState(op.name))
+                state.groups.add(GroupState(op.name, state.sourceCursor))
                 state.advanceOp()
                 ExecResult.Continue
             }
@@ -77,7 +98,10 @@ class Matcher(private val source: IntArray, private val opcodes: Array<Opcode>) 
                 val groupState = state.groups.removeLast()
                 if (groupState.key != null) {
                     expect(groupState.key !in state.groupContents)
-                    state.groupContents[groupState.key] = groupState.content.toIntArray()
+                    state.groupContents[groupState.key] = MatchGroup(
+                        groupState.content.toIntArray(),
+                        groupState.rangeStart until state.sourceCursor,
+                    )
                 }
                 state.advanceOp()
                 ExecResult.Continue
@@ -151,7 +175,7 @@ class Matcher(private val source: IntArray, private val opcodes: Array<Opcode>) 
                 } else ExecResult.Fail
             }
             is BackReferenceOp -> {
-                val content = state.groupContents[op.index]
+                val content = state.groupContents[op.index]?.codepoints
                 if (content == null)
                     TODO() // Is this actually possible?
 
@@ -209,7 +233,7 @@ class Matcher(private val source: IntArray, private val opcodes: Array<Opcode>) 
                 var newState = MatchState(state.sourceCursor, 0)
 
                 val matched = if (op.isAhead) {
-                    Matcher(source, op.opcodes).exec(newState) != null
+                    Matcher(source, op.opcodes, flags).exec(newState) != null
                 } else {
                     var matched = false
 
@@ -217,7 +241,7 @@ class Matcher(private val source: IntArray, private val opcodes: Array<Opcode>) 
                     for (newPos in state.sourceCursor downTo 0) {
                         newState = MatchState(newPos, 0)
 
-                        if (Matcher(source, op.opcodes).exec(newState) != null && newState.sourceCursor == state.sourceCursor) {
+                        if (Matcher(source, op.opcodes, flags).exec(newState) != null && newState.sourceCursor == state.sourceCursor) {
                             matched = true
                             break
                         }
@@ -259,9 +283,10 @@ class Matcher(private val source: IntArray, private val opcodes: Array<Opcode>) 
 
     private data class GroupState(
         val key: Any? /* Int | String | null (non-capturing) */,
+        var rangeStart: Int,
         var content: MutableList<Int> = mutableListOf(),
     ) {
-        fun copy() = GroupState(key, content.toMutableList())
+        fun copy() = GroupState(key, rangeStart, content.toMutableList())
     }
 
     private val MatchState.codepoint: Int
@@ -281,7 +306,7 @@ class Matcher(private val source: IntArray, private val opcodes: Array<Opcode>) 
         var sourceCursor: Int,
         var opcodeCursor: Int,
         val groups: MutableList<GroupState> = mutableListOf(),
-        val groupContents: MutableMap<Any /* Int | String */, IntArray> = mutableMapOf(),
+        val groupContents: MutableMap<Any /* Int | String */, MatchGroup> = mutableMapOf(),
     ) {
         fun advanceOp() {
             opcodeCursor++
@@ -291,7 +316,7 @@ class Matcher(private val source: IntArray, private val opcodes: Array<Opcode>) 
             sourceCursor,
             opcodeCursor,
             groups.map { it.copy() }.toMutableList(),
-            groupContents.mapValues { (_, v) -> v.copyOf() }.toMutableMap(),
+            groupContents.mapValues { (_, v) -> v.copy() }.toMutableMap(),
         )
 
         override fun toString() = "MatchState(SP=$sourceCursor, OP=$opcodeCursor)"

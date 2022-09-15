@@ -8,15 +8,17 @@ class RegExp(
 
     fun test(text: String) = match(text) != null
 
-    fun match(text: String): MatchResult? {
+    fun match(text: String) = matcher(text).match()
+
+    fun matcher(text: String): Matcher {
         // TODO: Use flags
 
         val opcodes = Parser(regexCodePoints, unicode = Flag.Unicode in flags).parse()
-        return Matcher(text.codePoints().toArray(), opcodes).match()
+        return Matcher(text.codePoints().toArray(), opcodes, flags)
     }
 
     enum class Flag {
-        Global,
+        Single,
         MultiLine,
         Insensitive,
         Sticky,
