@@ -22,16 +22,25 @@ class Matcher(private val source: IntArray, private val opcodes: List<Opcode>) {
                     // We shouldn't be able to end the regex inside of a group
                     expect(state.groups.isEmpty())
 
-                    val groupsList = state.groupContents.toList().sortedBy { it.first }
-                    groupsList.forEachIndexed { index, value ->
+                    val indexedGroups = state.groupContents.toList()
+                        .filter { it.first is Int }                        
+                        .sortedBy { it.first as Int } as List<Pair<Int, IntArray>>
+
+                    indexedGroups.forEachIndexed { index, value ->
                         expect(index == value.first)
                     }
 
+                    val namedGroups = state.groupContents.toList()
+                        .filter { it.first is String }
+                        .toMap() as Map<String, IntArray>
+
                     return MatchResult(
-                        groups = groupsList.map { (_, groupCPs) ->
+                        groups = indexedGroups.map { (_, groupCPs) ->
                             buildString { groupCPs.forEach(::appendCodePoint) }
                         },
-                        namedGroups = emptyMap(),
+                        namedGroups = namedGroups.mapValues { (_, groupCPs) ->
+                            buildString { groupCPs.forEach(::appendCodePoint) }
+                        },
                     )
                 }
                 ExecResult.Continue -> {}
@@ -52,11 +61,16 @@ class Matcher(private val source: IntArray, private val opcodes: List<Opcode>) {
                 state.advanceOp()
                 ExecResult.Continue
             }
+            is StartNamedGroupOp -> {
+                state.groups.add(GroupState(op.name))
+                state.advanceOp()
+                ExecResult.Continue
+            }
             is EndGroupOp -> {
                 val groupState = state.groups.removeLast()
-                if (groupState.index != null) {
-                    expect(groupState.index !in state.groupContents)
-                    state.groupContents[groupState.index] = groupState.content.toIntArray()
+                if (groupState.key != null) {
+                    expect(groupState.key !in state.groupContents)
+                    state.groupContents[groupState.key] = groupState.content.toIntArray()
                 }
                 state.advanceOp()
                 ExecResult.Continue
@@ -199,17 +213,17 @@ class Matcher(private val source: IntArray, private val opcodes: List<Opcode>) {
     }
 
     private data class GroupState(
-        val index: Int?,
+        val key: Any? /* Int | String | null (non-capturing) */,
         var content: MutableList<Int> = mutableListOf(),
     ) {
-        fun copy() = GroupState(index, content.toMutableList())
+        fun copy() = GroupState(key, content.toMutableList())
     }
     
     private inner class MatchState(
         var sourceCursor: Int,
         var opcodeCursor: Int,
         val groups: MutableList<GroupState> = mutableListOf(),
-        val groupContents: MutableMap<Int, IntArray> = mutableMapOf(),
+        val groupContents: MutableMap<Any /* Int | String */, IntArray> = mutableMapOf(),
     ) {
         val codepoint: Int
             inline get() = source[sourceCursor]

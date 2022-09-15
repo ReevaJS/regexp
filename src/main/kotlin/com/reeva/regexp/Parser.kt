@@ -4,6 +4,7 @@ class Parser(private val codepoints: IntArray, private val unicode: Boolean) {
     private val builder = OpcodeBuilder()
     private var nextGroupIndex = 0
     private var cursor = 0
+    private val groupNames = mutableSetOf<String>()
 
     private val states = mutableListOf<State>()
     private val state: State
@@ -49,9 +50,29 @@ class Parser(private val codepoints: IntArray, private val unicode: Boolean) {
                 state.modifierMark = builder.mark()
                 states.add(State())
 
-                val nonCapturing = consumeIf(0x3f, 0x3a /* ?: */)
+                if (consumeIf(0x3f, 0x3a /* ?: */)) {
+                    +StartGroupOp(null)
+                } else if (consumeIf(0x3f, 0x3c /* ?< */)) {
+                    val nameBuilder = StringBuilder()
 
-                +StartGroupOp(if (nonCapturing) null else nextGroupIndex++)
+                    while (!done && codepoint != 0x3e /* > */)  {
+                        nameBuilder.appendCodePoint(codepoint)
+                        cursor++
+                    }
+
+                    if (codepoint != 0x3e /* > */)
+                        error("Expected '>'")
+
+                    cursor++
+
+                    val name = nameBuilder.toString()
+                    if (!groupNames.add(name))
+                        error("Duplicate capturing group name \"$name\"")
+
+                    +StartNamedGroupOp(name)
+                } else {
+                    +StartGroupOp(nextGroupIndex)
+                }
 
                 while (!done && codepoint != 0x29 /* ) */)
                     parseSingle()

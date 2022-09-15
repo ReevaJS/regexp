@@ -24,6 +24,10 @@ class StartGroupOp(val index: Int?) : Opcode() {
     override fun toString() = "StartGroupOp($index)"
 }
 
+class StartNamedGroupOp(val name: String) : Opcode() {
+    override fun toString() = "StartNamedGroupOp($name)"
+}
+
 object EndGroupOp : Opcode() {
     override fun toString() = "EndGroupOp"
 }
