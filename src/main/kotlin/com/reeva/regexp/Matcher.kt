@@ -2,25 +2,6 @@ package com.reeva.regexp
 
 import com.ibm.icu.text.UnicodeSet
 
-class MatchGroup(
-    val codePoints: IntArray,
-    val range: IntRange,
-) {
-    val value = codePoints.codePointsToString()
-
-    fun copy() = MatchGroup(codePoints.copyOf(), range)
-
-    override fun toString() = "MatchGroup(\"$value\", range=$range)"
-}
-
-data class MatchResult(
-    val groups: List<MatchGroup>,
-    val namedGroups: Map<String, MatchGroup>,
-) {
-    val groupValues: List<String>
-        get() = groups.map { it.value }
-}
-
 class Matcher(
     private val source: IntArray, 
     private val opcodes: Array<Opcode>,
