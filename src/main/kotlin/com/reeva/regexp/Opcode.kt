@@ -52,6 +52,10 @@ object WhitespaceOp : Opcode() {
     override fun toString() = "Whitespace"
 }
 
+data class UnicodeClassOp(val class_: String) : Opcode() {
+    override fun toString() = "UnicodeClass($class_)"
+}
+
 data class BackReferenceOp(val index: Int) : Opcode() {
     override fun toString() = "BackReferenceOp(\\$index)"
 }

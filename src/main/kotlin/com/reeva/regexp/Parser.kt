@@ -63,21 +63,21 @@ class Parser(private val codePoints: IntArray, private val unicode: Boolean) {
                     consumeIf(0x3f, 0x3c, 0x21 /* ?<! */) -> lookOp = ::NegativeLookbehindOp
                     consumeIf(0x3f, 0x3c /* ?< */) -> {
                         val nameBuilder = StringBuilder()
-    
-                        while (!done && codePoint != 0x3e /* > */)  {
+
+                        while (!done && codePoint != 0x3e /* > */) {
                             nameBuilder.appendCodePoint(codePoint)
                             cursor++
                         }
-    
+
                         if (codePoint != 0x3e /* > */)
                             error("Expected '>'")
-    
+
                         cursor++
-    
+
                         val name = nameBuilder.toString()
                         if (!groupNames.add(name))
                             error("Duplicate capturing group name \"$name\"")
-    
+
                         +StartNamedGroupOp(name)
                     }
                     else -> +StartGroupOp(nextGroupIndex++)
@@ -86,7 +86,7 @@ class Parser(private val codePoints: IntArray, private val unicode: Boolean) {
                 while (!done && codePoint != 0x29 /* ) */)
                     parseSingle()
 
-                if (codePoint != 0x29 /* ) */) 
+                if (codePoint != 0x29 /* ) */)
                     error("Expected ')'")
 
                 states.removeLast()
@@ -254,7 +254,36 @@ class Parser(private val codePoints: IntArray, private val unicode: Boolean) {
                 // Negate the cursor increment that comes after this loop
                 cursor--
             }
-            0x70, 0x50 /* p, P */ -> TODO()
+            0x70, 0x50 /* p, P */ -> {
+                if (codePoint == 0x50)
+                    +NegateNextOp
+
+                cursor++
+                if (!done && codePoint != 0x7b /* { */)
+                    error("Expected '{'")
+
+                cursor++
+
+                val text = buildString {
+                    while (!done && codePoint != 0x7d /* } */) {
+                        appendCodePoint(codePoint)
+                        cursor++
+                    }
+                }
+
+                if (codePoint != 0x7d /* } */)
+                    error("Expected '}'")
+
+                cursor++
+
+                if (text !in unicodePropertyAliasList && text !in unicodeValueAliasesList)
+                    error("Unknown unicode property or category \"$text\"")
+
+                +UnicodeClassOp(text)
+
+                // Negate the cursor increment that comes after this loop
+                cursor--
+            }
             0x6b /* k */ -> TODO()
             else -> +CharOp(codePoint)
         }

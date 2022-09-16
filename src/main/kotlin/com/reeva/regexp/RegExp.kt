@@ -11,8 +11,6 @@ class RegExp(
     fun match(text: String) = matcher(text).match()
 
     fun matcher(text: String): Matcher {
-        // TODO: Use flags
-
         val opcodes = Parser(regexCodePoints, unicode = Flag.Unicode in flags).parse()
 
         for (op in opcodes)

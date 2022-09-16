@@ -1,5 +1,7 @@
 package com.reeva.regexp
 
+import com.ibm.icu.text.UnicodeSet
+
 class MatchGroup(
     val codePoints: IntArray,
     val range: IntRange,
@@ -172,6 +174,17 @@ class Matcher(
                     ExecResult.Continue
                 } else ExecResult.Fail
             }
+            is UnicodeClassOp -> {
+                val set = unicodeSets.getOrPut(op.class_) {
+                    UnicodeSet("[\\p{${op.class_}}]").freeze()
+                }
+
+                if (!state.done && state.codePoint in set) {
+                    state.advanceSource()
+                    state.advanceOp()
+                    ExecResult.Continue
+                } else ExecResult.Fail
+            }
             is BackReferenceOp -> {
                 val content = state.groupContents[op.index]?.codePoints ?: TODO()
 
@@ -324,5 +337,9 @@ class Matcher(
         )
 
         override fun toString() = "MatchState(SP=$sourceCursor, OP=$opcodeCursor)"
+    }
+
+    companion object {
+        private val unicodeSets = mutableMapOf<String, UnicodeSet>()
     }
 }
