@@ -105,6 +105,18 @@ class Jump(offset: Int) : OffsetOpcode(offset) {
     override fun toString() = "Jump($offset)"
 }
 
+class RangeCheck(val min: Int, val max: Int?) : Opcode() {
+    override fun toString() = "RangeCheck($min, $max)"
+}
+
+class JumpIfBelowRange(offset: Int) : OffsetOpcode(offset) {
+    override fun toString() = "JumpIfBelowRange($offset)"
+}
+
+class JumpIfAboveRange(offset: Int) : OffsetOpcode(offset) {
+    override fun toString() = "JumpIfAboveRange($offset)"
+}
+
 sealed class LookOp(val opcodes: Array<Opcode>, val isPositive: Boolean, val isAhead: Boolean) : Opcode() {
     override fun toString() = buildString {
         append(this@LookOp::class.simpleName!!.replace("Op", ""))

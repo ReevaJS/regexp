@@ -321,7 +321,7 @@ class Parser(private val codePoints: IntArray, private val unicode: Boolean) {
                 val lazy = consumeIf(0x3f /* ? */)
 
                 /*
-                 * Fork/ForkNow X+1
+                 * Fork/ForkNow X+2
                  * <X opcodes>
                  * ForkNow/Fork -X
                  */
@@ -356,12 +356,10 @@ class Parser(private val codePoints: IntArray, private val unicode: Boolean) {
                 cursor++
 
                 /*
-                 *
                  * Fork X+2
                  * <X opcodes>
                  * Jump Y+1
                  * <Y opcodes>
-                 *
                  */
 
                 val alternationMark = state.alternationMark
@@ -370,6 +368,53 @@ class Parser(private val codePoints: IntArray, private val unicode: Boolean) {
                 alternationMark.insertBefore(Fork(numTargetOpcodes + 2)) // Skip the jump
                 +Jump(numTargetOpcodes + 1)
                 state.alternationMark = builder.mark()
+            }
+            0x7b /* { */ -> {
+                cursor++
+
+                /*
+                 * RangeCheck [A, B]
+                 * JumpIfBelowRange +3
+                 * JumpIfAboveRange X+2
+                 * Fork/ForkNow X+1
+                 * <X opcodes>
+                 * Jump -X-5
+                 */
+
+                val modifierMark = state.modifierMark
+                val numTargetOpcodes = builder.size - modifierMark.offset
+
+                val firstBound = parseNumericValue(1, 8, base = 10) ?: error("Expected number")
+
+                if (done)
+                    error("Expected ',' or '}'")
+
+                val secondBound = if (codePoint == 0x2c /* , */) {
+                    cursor++
+                    val secondBound = parseNumericValue(1, 8, base = 10)
+                    if (done || codePoint != 0x7d /* } */)
+                    error("Expected '}'")
+                    
+                    cursor++
+                    secondBound
+                } else {
+                    if (done || codePoint != 0x7d /* } */)
+                        error("Expected '}'")
+
+                    cursor++
+                    firstBound
+                }
+
+                val lazy = consumeIf(0x3f /* ? */)
+
+                modifierMark.insertBefore(RangeCheck(firstBound, secondBound))
+                modifierMark.insertBefore(JumpIfBelowRange(3))
+                modifierMark.insertBefore(JumpIfAboveRange(numTargetOpcodes + 2))
+
+                val forkOp = if (lazy) ::ForkNow else ::Fork
+                modifierMark.insertBefore(forkOp(numTargetOpcodes + 1))
+
+                +Jump(-numTargetOpcodes - 5)
             }
             else -> return
         }
@@ -408,7 +453,9 @@ class Parser(private val codePoints: IntArray, private val unicode: Boolean) {
     }
 
     private fun parseNumericValue(min: Int, max: Int, base: Int): Int? {
-        return parseNumericValueAndLength(min, max, base)?.first
+        val result = parseNumericValueAndLength(min, max, base) ?: return null
+        cursor += result.second
+        return result.first
     }
 
     private fun consumeIf(vararg codePoints: Int): Boolean {

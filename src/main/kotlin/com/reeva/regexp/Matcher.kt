@@ -9,6 +9,8 @@ class Matcher(
 ) {
     private val pendingStates = mutableListOf<MatchState>()
     private var negateNext = false
+    private val rangeCounts = mutableMapOf<Int, Int>()
+    private var rangeResult: RangeResult? = null
 
     fun match(startIndex: Int = 0): List<MatchResult>? {
         pendingStates.clear()
@@ -244,6 +246,32 @@ class Matcher(
                 state.opcodeCursor += op.offset + 1
                 ExecResult.Continue
             }
+            is RangeCheck -> {
+                state.advanceOp()
+                val currentValue = rangeCounts.getOrPut(state.opcodeCursor) { 0 }
+                
+                rangeResult = when {
+                    currentValue < op.min -> RangeResult.Below
+                    op.max != null && currentValue > op.max -> RangeResult.Above
+                    else -> RangeResult.In
+                }
+
+                rangeCounts[state.opcodeCursor] = currentValue + 1
+                
+                ExecResult.Continue
+            }
+            is JumpIfBelowRange -> {
+                state.advanceOp()
+                if (rangeResult == RangeResult.Below)
+                state.opcodeCursor += op.offset
+                ExecResult.Continue
+            }
+            is JumpIfAboveRange -> {
+                state.advanceOp()
+                if (rangeResult == RangeResult.Above)
+                    state.opcodeCursor += op.offset
+                ExecResult.Continue
+            }
             is LookOp -> {
                 expect(!negateNext)
                 state.advanceOp()
@@ -346,6 +374,12 @@ class Matcher(
         )
 
         override fun toString() = "MatchState(SP=$sourceCursor, OP=$opcodeCursor)"
+    }
+
+    private enum class RangeResult {
+        Below,
+        In,
+        Above
     }
 
     companion object {
