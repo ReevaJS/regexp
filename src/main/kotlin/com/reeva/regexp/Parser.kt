@@ -1,6 +1,6 @@
 package com.reeva.regexp
 
-class Parser(private val codepoints: IntArray, private val unicode: Boolean) {
+class Parser(private val codePoints: IntArray, private val unicode: Boolean) {
     private var builder = OpcodeBuilder()
     private var nextGroupIndex = 0
     private var cursor = 0
@@ -10,11 +10,11 @@ class Parser(private val codepoints: IntArray, private val unicode: Boolean) {
     private val state: State
         get() = states.last()
 
-    private val codepoint: Int
-        get() = codepoints[cursor]
+    private val codePoint: Int
+        get() = codePoints[cursor]
 
     private val done: Boolean
-        get() = cursor > codepoints.lastIndex
+        get() = cursor > codePoints.lastIndex
 
     constructor(source: String, unicode: Boolean) : this(source.codePoints().toArray(), unicode)
 
@@ -43,7 +43,7 @@ class Parser(private val codepoints: IntArray, private val unicode: Boolean) {
     }
 
     private fun parsePrimary() {
-        when (codepoint) {
+        when (codePoint) {
             0x28 /* ( */ -> {
                 cursor++
 
@@ -64,12 +64,12 @@ class Parser(private val codepoints: IntArray, private val unicode: Boolean) {
                     consumeIf(0x3f, 0x3c /* ?< */) -> {
                         val nameBuilder = StringBuilder()
     
-                        while (!done && codepoint != 0x3e /* > */)  {
-                            nameBuilder.appendCodePoint(codepoint)
+                        while (!done && codePoint != 0x3e /* > */)  {
+                            nameBuilder.appendCodePoint(codePoint)
                             cursor++
                         }
     
-                        if (codepoint != 0x3e /* > */)
+                        if (codePoint != 0x3e /* > */)
                             error("Expected '>'")
     
                         cursor++
@@ -83,10 +83,10 @@ class Parser(private val codepoints: IntArray, private val unicode: Boolean) {
                     else -> +StartGroupOp(nextGroupIndex++)
                 }
 
-                while (!done && codepoint != 0x29 /* ) */)
+                while (!done && codePoint != 0x29 /* ) */)
                     parseSingle()
 
-                if (codepoint != 0x29 /* ) */) 
+                if (codePoint != 0x29 /* ) */) 
                     error("Expected ')'")
 
                 states.removeLast()
@@ -111,21 +111,21 @@ class Parser(private val codepoints: IntArray, private val unicode: Boolean) {
 
                 val ops = mutableListOf<Opcode>()
 
-                if (codepoint == 0x5e /* ^ */) {
+                if (codePoint == 0x5e /* ^ */) {
                     cursor++
                     +NegateNextOp
                 }
 
-                while (!done && codepoint != 0x5d /* ] */) {
-                    if (codepoint == 0x5c /* \ */)
+                while (!done && codePoint != 0x5d /* ] */) {
+                    if (codePoint == 0x5c /* \ */)
                         TODO()
 
-                    val start = codepoint
+                    val start = codePoint
                     cursor++
 
-                    if (!done && codepoint == 0x2d /* - */ && peek(1) != 0x5d /* ] */) {
+                    if (!done && codePoint == 0x2d /* - */ && peek(1) != 0x5d /* ] */) {
                         cursor++
-                        val end = codepoint
+                        val end = codePoint
 
                         if (start > end)
                             error("Character class range is out-of-order")
@@ -136,7 +136,7 @@ class Parser(private val codepoints: IntArray, private val unicode: Boolean) {
                     }
                 }
 
-                if (codepoint != 0x5d /* ] */)
+                if (codePoint != 0x5d /* ] */)
                     error("Expected closing ']'")
 
                 cursor++
@@ -161,11 +161,11 @@ class Parser(private val codepoints: IntArray, private val unicode: Boolean) {
                 +AnyOp
             }
             else -> {
-                if (codepoint in charsThatRequireEscape)
-                    error("Unescaped \"${codepoint.toChar()}\"")
+                if (codePoint in charsThatRequireEscape)
+                    error("Unescaped \"${codePoint.toChar()}\"")
 
                 state.modifierMark = builder.mark()
-                +CharOp(codepoint).also { cursor++ }
+                +CharOp(codePoint).also { cursor++ }
             }
         }
     }
@@ -177,7 +177,7 @@ class Parser(private val codepoints: IntArray, private val unicode: Boolean) {
 
         state.modifierMark = builder.mark()
 
-        when (codepoint) {
+        when (codePoint) {
             0x74 /* t */ -> +CharOp(0x9)
             0x6e /* n */ -> +CharOp(0xa)
             0x76 /* v */ -> +CharOp(0xb)
@@ -214,7 +214,7 @@ class Parser(private val codepoints: IntArray, private val unicode: Boolean) {
                     result = parseNumericValueAndLength(1, 3, base = 8)
                     if (result == null) {
                         cursor++
-                        +CharOp(codepoint)
+                        +CharOp(codePoint)
                     } else {
                         cursor += result.second
                         +CharOp(result.first)
@@ -226,23 +226,23 @@ class Parser(private val codepoints: IntArray, private val unicode: Boolean) {
 
                 // TODO: This isn't quite correct for invalid hex. For example, "\u{zzzz}"
                 // should parse as the character "u" followed by the characters "{zzzz}"
-                val codepoint = if (unicode && codepoint == 0x7b /* { */) {
+                val codePoint = if (unicode && codePoint == 0x7b /* { */) {
                     cursor++
                     val v = parseNumericValue(1, 6, base = 16)
-                    if (codepoint != 0x7d /* } */)
+                    if (codePoint != 0x7d /* } */)
                         error("Expected '}' to close unicode escape sequence")
 
                     cursor++
                     v
                 } else parseNumericValue(4, 4, base = 16)
 
-                if (codepoint == null)
+                if (codePoint == null)
                     error("Expected hexadecimal number")
 
-                if (codepoint >= 0x10ffff)
-                    error("Codepoint ${codepoint.toString(radix = 16)} is too large")
+                if (codePoint >= 0x10ffff)
+                    error("Codepoint ${codePoint.toString(radix = 16)} is too large")
 
-                +CharOp(codepoint)
+                +CharOp(codePoint)
 
                 // Negate the cursor increment that comes after this loop
                 cursor--
@@ -256,14 +256,14 @@ class Parser(private val codepoints: IntArray, private val unicode: Boolean) {
             }
             0x70, 0x50 /* p, P */ -> TODO()
             0x6b /* k */ -> TODO()
-            else -> +CharOp(codepoint)
+            else -> +CharOp(codePoint)
         }
 
         cursor++
     }
 
     private fun parseSecondary() {
-        when (codepoint) {
+        when (codePoint) {
             0x3f /* ? */ -> {
                 cursor++
                 val lazy = consumeIf(0x3f /* ? */)
@@ -340,7 +340,7 @@ class Parser(private val codepoints: IntArray, private val unicode: Boolean) {
         }
     }
 
-    private fun codepointToInt(cp: Int, base: Int): Int? {
+    private fun codePointToInt(cp: Int, base: Int): Int? {
         if (cp in 0x30..0x39 /* 0-9 */)
             return (cp - 0x30).takeIf { it < base }
 
@@ -360,8 +360,8 @@ class Parser(private val codepoints: IntArray, private val unicode: Boolean) {
         var value = 0
         var numChars = 0
 
-        while (cursor + numChars <= codepoints.lastIndex && numChars < max) {
-            val digitValue = codepointToInt(codepoints[cursor + numChars], base) ?: break
+        while (cursor + numChars <= codePoints.lastIndex && numChars < max) {
+            val digitValue = codePointToInt(codePoints[cursor + numChars], base) ?: break
             value = (value shl 4) or digitValue
             numChars++
         }
@@ -376,20 +376,20 @@ class Parser(private val codepoints: IntArray, private val unicode: Boolean) {
         return parseNumericValueAndLength(min, max, base)?.first
     }
 
-    private fun consumeIf(vararg codepoints: Int): Boolean {
-        if (cursor + codepoints.size >= this.codepoints.lastIndex)
+    private fun consumeIf(vararg codePoints: Int): Boolean {
+        if (cursor + codePoints.size >= this.codePoints.lastIndex)
             return false
 
-        for ((i, cp) in codepoints.withIndex()) {
-            if (this.codepoints[cursor + i] != cp)
+        for ((i, cp) in codePoints.withIndex()) {
+            if (this.codePoints[cursor + i] != cp)
                 return false
         }
 
-        cursor += codepoints.size
+        cursor += codePoints.size
         return true
     }
 
-    private fun peek(n: Int): Int? = codepoints.getOrNull(cursor + n)
+    private fun peek(n: Int): Int? = codePoints.getOrNull(cursor + n)
 
     private fun error(message: String): Nothing = throw RegexSyntaxError(message, cursor)
 

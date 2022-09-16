@@ -1,12 +1,12 @@
 package com.reeva.regexp
 
 class MatchGroup(
-    val codepoints: IntArray,
+    val codePoints: IntArray,
     val range: IntRange,
 ) {
-    val value = codepoints.codePointsToString()
+    val value = codePoints.codePointsToString()
 
-    fun copy() = MatchGroup(codepoints.copyOf(), range)
+    fun copy() = MatchGroup(codePoints.copyOf(), range)
 
     override fun toString() = "MatchGroup(\"$value\", range=$range)"
 }
@@ -105,7 +105,7 @@ class Matcher(
                 ExecResult.Continue
             }
             is CharOp -> {
-                if (!state.done && state.codepoint == op.codepoint) {
+                if (!state.done && state.codePoint == op.codePoint) {
                     state.advanceSource()
                     state.advanceOp()
                     ExecResult.Continue
@@ -125,7 +125,7 @@ class Matcher(
                 return ExecResult.Fail
             }
             is CharRangeOp -> {
-                if (!state.done && state.codepoint in op.start..op.end) {
+                if (!state.done && state.codePoint in op.start..op.end) {
                     state.advanceSource()
                     state.advanceOp()
                     ExecResult.Continue
@@ -140,7 +140,7 @@ class Matcher(
                 }
             }
             WordOp -> {
-                if (!state.done && isWordCodepoint(state.codepoint)) {
+                if (!state.done && isWordCodepoint(state.codePoint)) {
                     state.advanceSource()
                     state.advanceOp()
                     ExecResult.Continue
@@ -151,7 +151,7 @@ class Matcher(
                     isWordCodepoint(source[state.sourceCursor - 1])
                 } else false
 
-                val currentIsWord = !state.done && isWordCodepoint(state.codepoint)
+                val currentIsWord = !state.done && isWordCodepoint(state.codePoint)
 
                 if (lastIsWord != currentIsWord) {
                     state.advanceOp()
@@ -159,21 +159,21 @@ class Matcher(
                 } else ExecResult.Fail
             }
             DigitOp -> {
-                if (!state.done && state.codepoint in 0x30..0x39 /* 0-9 */) {
+                if (!state.done && state.codePoint in 0x30..0x39 /* 0-9 */) {
                     state.advanceSource()
                     state.advanceOp()
                     ExecResult.Continue
                 } else ExecResult.Fail
             }
             WhitespaceOp -> {
-                if (!state.done && isWhitespaceCodepoint(state.codepoint)) {
+                if (!state.done && isWhitespaceCodepoint(state.codePoint)) {
                     state.advanceSource()
                     state.advanceOp()
                     ExecResult.Continue
                 } else ExecResult.Fail
             }
             is BackReferenceOp -> {
-                val content = state.groupContents[op.index]?.codepoints ?: TODO()
+                val content = state.groupContents[op.index]?.codePoints ?: TODO()
 
                 val startCursor = state.sourceCursor
                 if (startCursor + content.size > source.size)
@@ -291,7 +291,7 @@ class Matcher(
     private val MatchState.done: Boolean
         get() = sourceCursor > source.lastIndex
 
-    private val MatchState.codepoint: Int
+    private val MatchState.codePoint: Int
         get() = source[sourceCursor]
 
     private val MatchState.op: Opcode

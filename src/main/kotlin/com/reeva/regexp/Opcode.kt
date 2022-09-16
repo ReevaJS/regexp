@@ -4,10 +4,10 @@ sealed class Opcode
 
 // Everything is stored as an int, since storing it as a Char does _actually_
 // save any space (all integer types except Long are reduced to Int on the JVM)
-class CharOp(val codepoint: Int) : Opcode() {
-    override fun toString() = if (codepoint < Char.MAX_VALUE.code) {
-        "Char(${codepoint.toChar()})"
-    } else "Char($codepoint)"
+class CharOp(val codePoint: Int) : Opcode() {
+    override fun toString() = if (codePoint < Char.MAX_VALUE.code) {
+        "Char(${codePoint.toChar()})"
+    } else "Char($codePoint)"
 }
 
 class CharClassOp(val numEntries: Int) : Opcode() {
