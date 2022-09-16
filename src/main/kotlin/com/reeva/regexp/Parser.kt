@@ -203,19 +203,41 @@ class Parser(private val codepoints: IntArray, private val unicode: Boolean) {
                 +NegateNextOp
                 +WordOp
             }
-            in 0x30..0x39 /* 1-9 */ -> +BackReferenceOp(codepoint - 0x30)
+            in 0x30..0x39 /* 1-9 */ -> {
+                // Check for back reference, which would be in hex
+                var result = parseNumericValueAndLength(1, 3, base = 16)
+                if (result != null && result.first < nextGroupIndex) {
+                    cursor += result.second
+                    +BackReferenceOp(result.first)
+                } else {
+                    // Check for octal escape
+                    result = parseNumericValueAndLength(1, 3, base = 8)
+                    if (result == null) {
+                        cursor++
+                        +CharOp(codepoint)
+                    } else {
+                        cursor += result.second
+                        +CharOp(result.first)
+                    }
+                }
+            }
             0x75 /* u */ -> {
                 cursor++
 
+                // TODO: This isn't quite correct for invalid hex. For example, "\u{zzzz}"
+                // should parse as the character "u" followed by the characters "{zzzz}"
                 val codepoint = if (unicode && codepoint == 0x7b /* { */) {
                     cursor++
-                    val v = parseHexValue(1, 6)
+                    val v = parseNumericValue(1, 6, base = 16)
                     if (codepoint != 0x7d /* } */)
                         error("Expected '}' to close unicode escape sequence")
 
                     cursor++
                     v
-                } else parseHexValue(4, 4)
+                } else parseNumericValue(4, 4, base = 16)
+
+                if (codepoint == null)
+                    error("Expected hexadecimal number")
 
                 if (codepoint >= 0x10ffff)
                     error("Codepoint ${codepoint.toString(radix = 16)} is too large")
@@ -227,7 +249,7 @@ class Parser(private val codepoints: IntArray, private val unicode: Boolean) {
             }
             0x78 /* x */ -> {
                 cursor++
-                +CharOp(parseHexValue(2, 2))
+                +CharOp(parseNumericValue(2, 2, base = 16) ?: 0x78)
 
                 // Negate the cursor increment that comes after this loop
                 cursor--
@@ -318,24 +340,40 @@ class Parser(private val codepoints: IntArray, private val unicode: Boolean) {
         }
     }
 
-    private fun parseHexValue(min: Int, max: Int): Int {
+    private fun codepointToInt(cp: Int, base: Int): Int? {
+        if (cp in 0x30..0x39 /* 0-9 */)
+            return (cp - 0x30).takeIf { it < base }
+
+        if (cp in 0x41..0x5a /* A-Z */)
+            return (cp - 0x41 + 10).takeIf { it < base }
+
+        if (cp in 0x61..0x7a /* a-z */)
+            return (cp - 0x61 + 10).takeIf { it < base }
+
+        return null
+    }
+
+    private fun parseNumericValueAndLength(min: Int, max: Int, base: Int): Pair<Int, Int>? {
         expect(min >= 0 && max <= 8)
+        expect(base <= 16)
 
         var value = 0
         var numChars = 0
 
         while (!done && numChars < max) {
-            if (codepoint in 0x30..0x39 /* 0-9 */) {
-                value = (value shl 4) or (codepoint - 0x30)
-                numChars++
-                cursor++
-            } else break
+            val digitValue = codepointToInt(codepoints[cursor + numChars], base) ?: break
+            value = (value shl 4) or digitValue
+            numChars++
         }
 
         if (numChars !in min..max)
-            error("Expected $min-$max hexadecimal characters")
+            return null
 
-        return value
+        return value to numChars
+    }
+
+    private fun parseNumericValue(min: Int, max: Int, base: Int): Int? {
+        return parseNumericValueAndLength(min, max, base)?.first
     }
 
     private fun consumeIf(vararg codepoints: Int): Boolean {

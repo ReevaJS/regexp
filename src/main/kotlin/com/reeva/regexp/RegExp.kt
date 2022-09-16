@@ -14,16 +14,18 @@ class RegExp(
         // TODO: Use flags
 
         val opcodes = Parser(regexCodePoints, unicode = Flag.Unicode in flags).parse()
+
+        for (op in opcodes)
+            println(op)
+        println()
+
         return Matcher(text.codePoints().toArray(), opcodes, flags)
     }
 
     enum class Flag {
-        Single,
         MultiLine,
         Insensitive,
-        Sticky,
         Unicode,
         SingleLine,
-        Indices,
     }
 }
