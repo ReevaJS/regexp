@@ -62,19 +62,7 @@ class Parser(private val codePoints: IntArray, private val unicode: Boolean) {
                     consumeIf(0x3f, 0x3c, 0x3d /* ?<= */) -> lookOp = ::PositiveLookbehindOp
                     consumeIf(0x3f, 0x3c, 0x21 /* ?<! */) -> lookOp = ::NegativeLookbehindOp
                     consumeIf(0x3f, 0x3c /* ?< */) -> {
-                        val nameBuilder = StringBuilder()
-
-                        while (!done && codePoint != 0x3e /* > */) {
-                            nameBuilder.appendCodePoint(codePoint)
-                            cursor++
-                        }
-
-                        if (codePoint != 0x3e /* > */)
-                            error("Expected '>'")
-
-                        cursor++
-
-                        val name = nameBuilder.toString()
+                        val name = parseName(endDelimiter = 0x3e /* > */)
                         if (!groupNames.add(name))
                             error("Duplicate capturing group name \"$name\"")
 
@@ -86,11 +74,10 @@ class Parser(private val codePoints: IntArray, private val unicode: Boolean) {
                 while (!done && codePoint != 0x29 /* ) */)
                     parseSingle()
 
-                if (codePoint != 0x29 /* ) */)
+                if (!consumeIf(0x29 /* ) */))
                     error("Expected ')'")
 
                 states.removeLast()
-                cursor++
 
                 if (lookOp != null)
                     +MatchOp
@@ -139,10 +126,8 @@ class Parser(private val codePoints: IntArray, private val unicode: Boolean) {
                     }
                 }
 
-                if (codePoint != 0x5d /* ] */)
+                if (!consumeIf(0x5d /* ] */))
                     error("Expected closing ']'")
-
-                cursor++
 
                 val ops = builder.build()
                 builder = previousBuilder
@@ -235,12 +220,10 @@ class Parser(private val codePoints: IntArray, private val unicode: Boolean) {
                 // should parse as the character "u" followed by the characters "{zzzz}"
                 val codePoint = if (unicode && codePoint == 0x7b /* { */) {
                     cursor++
-                    val v = parseNumericValue(1, 6, base = 16)
-                    if (codePoint != 0x7d /* } */)
-                        error("Expected '}' to close unicode escape sequence")
-
-                    cursor++
-                    v
+                    parseNumericValue(1, 6, base = 16).also {
+                        if (!consumeIf(0x7d /* } */))
+                            error("Expected '}' to close unicode escape sequence")
+                    }
                 } else parseNumericValue(4, 4, base = 16)
 
                 if (codePoint == null)
@@ -266,22 +249,10 @@ class Parser(private val codePoints: IntArray, private val unicode: Boolean) {
                     +NegateNextOp
 
                 cursor++
-                if (!done && codePoint != 0x7b /* { */)
+                if (!consumeIf(0x7b /* { */))
                     error("Expected '{'")
 
-                cursor++
-
-                val text = buildString {
-                    while (!done && codePoint != 0x7d /* } */) {
-                        appendCodePoint(codePoint)
-                        cursor++
-                    }
-                }
-
-                if (codePoint != 0x7d /* } */)
-                    error("Expected '}'")
-
-                cursor++
+                val text = parseName(endDelimiter = 0x7d /* } */)
 
                 if (text !in unicodePropertyAliasList && text !in unicodeValueAliasesList)
                     error("Unknown unicode property or category \"$text\"")
@@ -294,17 +265,7 @@ class Parser(private val codePoints: IntArray, private val unicode: Boolean) {
             0x6b /* k */ -> {
                 cursor++
                 if (consumeIf(0x3c /* < */)) {
-                    val text = buildString {
-                        while (!done && codePoint != 0x3e /* > */) {
-                            appendCodePoint(codePoint)
-                            cursor++
-                        }
-                    }
-
-                    if (!consumeIf(0x3e /* > */))
-                        error("Expected closing '>'")
-
-                    +BackReferenceOp(text)
+                    +BackReferenceOp(parseName(endDelimiter = 0x3e /* > */))
                 } else {
                     +CharOp(0x6b)
                 }
@@ -407,21 +368,12 @@ class Parser(private val codePoints: IntArray, private val unicode: Boolean) {
                 if (done)
                     error("Expected ',' or '}'")
 
-                val secondBound = if (codePoint == 0x2c /* , */) {
-                    cursor++
-                    val secondBound = parseNumericValue(1, 8, base = 10)
-                    if (done || codePoint != 0x7d /* } */)
-                    error("Expected '}'")
-                    
-                    cursor++
-                    secondBound
-                } else {
-                    if (done || codePoint != 0x7d /* } */)
-                        error("Expected '}'")
+                val secondBound = if (consumeIf(0x2c /* , */)) {
+                    parseNumericValue(1, 8, base = 10)
+                } else firstBound
 
-                    cursor++
-                    firstBound
-                }
+                if (!consumeIf(0x7d /* } */))
+                    error("Expected '}'")
 
                 val lazy = consumeIf(0x3f /* ? */)
 
@@ -474,6 +426,35 @@ class Parser(private val codePoints: IntArray, private val unicode: Boolean) {
         val result = parseNumericValueAndLength(min, max, base) ?: return null
         cursor += result.second
         return result.first
+    }
+
+    private fun parseName(endDelimiter: Int): String {
+        val start = cursor
+        val name = consumeUntil(endDelimiter) ?: error("Expected valid name")
+
+        if (done || codePoint != endDelimiter)
+            error("Expected '${endDelimiter.toChar()}")
+
+        cursor++
+
+        name.forEachIndexed { index, ch ->
+            if (!isWordCodepoint(ch)) {
+                cursor = start + index
+                error("Invalid character '${ch.toChar()}' in name")
+            }
+        }
+
+        return name.codePointsToString()
+    }
+
+    private fun consumeUntil(delimiter: Int): IntArray? {
+        val start = cursor
+        while (!done && codePoint != delimiter)
+            cursor++
+
+        return if (cursor != start) {
+            codePoints.copyOfRange(start, cursor)
+        } else null
     }
 
     private fun consumeIf(vararg codePoints: Int): Boolean {
