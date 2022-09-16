@@ -270,7 +270,7 @@ class Matcher(
     }
 
     private fun isWordCodepoint(cp: Int): Boolean =
-        cp in 0x41..0x5a /*A-Z*/ || cp in 0x6a..0x7a /*a-z*/ || cp in 0x30..0x39 /*0-9*/ || cp == 0x5f /*_*/
+        cp in 0x41..0x5a /*A-Z*/ || cp in 0x61..0x7a /*a-z*/ || cp in 0x30..0x39 /*0-9*/ || cp == 0x5f /*_*/
 
     // TODO: Are these the only characters? Does unicode mode change this?
     private fun isWhitespaceCodepoint(cp: Int): Boolean =
