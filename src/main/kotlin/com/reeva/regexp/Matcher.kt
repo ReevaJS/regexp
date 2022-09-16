@@ -44,7 +44,7 @@ class Matcher(
             val result = exec(MatchState(sourceIndex, 0))
             if (result != null) {
                 results.add(result)
-                sourceIndex = result.groups[0].range.last
+                sourceIndex = result.groups[0].range.last + 1
             } else {
                 sourceIndex++
             }
