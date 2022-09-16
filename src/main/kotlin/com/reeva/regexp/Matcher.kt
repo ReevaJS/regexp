@@ -186,7 +186,7 @@ class Matcher(
                 } else ExecResult.Fail
             }
             is BackReferenceOp -> {
-                val content = state.groupContents[op.index]?.codePoints ?: TODO()
+                val content = state.groupContents[op.key]?.codePoints ?: TODO()
 
                 val startCursor = state.sourceCursor
 

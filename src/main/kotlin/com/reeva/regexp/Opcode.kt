@@ -60,8 +60,8 @@ data class UnicodeClassOp(val class_: String) : Opcode() {
     override fun toString() = "UnicodeClass($class_)"
 }
 
-data class BackReferenceOp(val index: Int) : Opcode() {
-    override fun toString() = "BackReferenceOp(\\$index)"
+data class BackReferenceOp(val key: Any /* String | Int */) : Opcode() {
+    override fun toString() = "BackReferenceOp(\\$key)"
 }
 
 object StartOp : Opcode() {

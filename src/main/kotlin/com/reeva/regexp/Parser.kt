@@ -291,7 +291,24 @@ class Parser(private val codePoints: IntArray, private val unicode: Boolean) {
                 // Negate the cursor increment that comes after this loop
                 cursor--
             }
-            0x6b /* k */ -> TODO()
+            0x6b /* k */ -> {
+                cursor++
+                if (consumeIf(0x3c /* < */)) {
+                    val text = buildString {
+                        while (!done && codePoint != 0x3e /* > */) {
+                            appendCodePoint(codePoint)
+                            cursor++
+                        }
+                    }
+
+                    if (!consumeIf(0x3e /* > */))
+                        error("Expected closing '>'")
+
+                    +BackReferenceOp(text)
+                } else {
+                    +CharOp(0x6b)
+                }
+            }
             else -> +CharOp(codePoint)
         }
 
