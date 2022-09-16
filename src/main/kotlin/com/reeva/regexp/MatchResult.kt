@@ -17,4 +17,42 @@ data class MatchResult(
 ) {
     val groupValues: List<String>
         get() = groups.map { it.value }
+
+    override fun toString() = buildString {
+        append("MatchResult(")
+        if (groups.isEmpty() && namedGroups.isEmpty()) {
+            append("<empty>)")
+            return@buildString
+        }
+
+        for ((index, group) in groups.withIndex()) {
+            appendGroup(index, group)
+
+            if (index != groups.lastIndex)
+                append(", ")
+        }
+
+        if (groups.isNotEmpty() && namedGroups.isNotEmpty())
+            append(", ")
+
+        for ((index, group) in namedGroups.entries.withIndex()) {
+            appendGroup(group.key, group.value)
+
+            if (index != namedGroups.size - 1)
+                append(", ")
+        }
+
+        append(")")
+    }
+
+    private fun StringBuilder.appendGroup(key: Any, group: MatchGroup) {
+        append(key)
+        append(": \"")
+        append(group.value)
+        append("\" [")
+        append(group.range.first)
+        append("..")
+        append(group.range.last)
+        append("]")
+    }
 }
