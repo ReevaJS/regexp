@@ -27,3 +27,6 @@ class RegExp(
         SingleLine,
     }
 }
+
+fun String.toRegExp(vararg flags: RegExp.Flag) =
+    RegExp(codePoints().toArray(), flags.toSet())

@@ -1,6 +1,6 @@
 package com.reeva.regexp
 
-class MatchGroup(
+data class MatchGroup(
     val codePoints: IntArray,
     val range: IntRange,
 ) {

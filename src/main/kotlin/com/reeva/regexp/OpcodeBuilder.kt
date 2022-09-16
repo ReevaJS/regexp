@@ -62,5 +62,9 @@ internal class OpcodeBuilder {
         fun insertBefore(opcode: Opcode) = addOpcode(offset, opcode)
 
         fun insertAfter(opcode: Opcode) = addOpcode(offset + 1, opcode)
+
+        fun replace(opcode: Opcode) {
+            opcodes[offset] = opcode
+        }
     }
 }

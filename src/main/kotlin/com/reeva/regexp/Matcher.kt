@@ -185,7 +185,13 @@ class Matcher(
                 } else ExecResult.Fail
             }
             is BackReferenceOp -> {
-                val content = state.groupContents[op.key]?.codePoints ?: TODO()
+                // Take the following regexp as an example: "\k<a>(?<a>x)"
+                // This regex will match "x", meaning that if this group doesn't exist, we should
+                // consume nothing and return Continue
+                val content = state.groupContents[op.key]?.codePoints ?: run {
+                    state.advanceOp()
+                    return if (checkCondition(true)) ExecResult.Continue else ExecResult.Fail
+                }
 
                 val startCursor = state.sourceCursor
 

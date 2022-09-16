@@ -5,6 +5,8 @@ class Parser(private val codePoints: IntArray, private val unicode: Boolean) {
     private var nextGroupIndex = 0
     private var cursor = 0
     private val groupNames = mutableSetOf<String>()
+    private val backrefNames = mutableSetOf<String>()
+    private val indexedBackrefs = mutableListOf<Pair<OpcodeBuilder.Mark, NumberInfo>>()
 
     private val states = mutableListOf<State>()
     private val state: State
@@ -31,6 +33,30 @@ class Parser(private val codePoints: IntArray, private val unicode: Boolean) {
 
         +EndGroupOp
         +MatchOp
+        
+        // Ensure no unknown group names are used
+        for (name in backrefNames) {
+            if (name !in groupNames) 
+                error("Unknown capturing group name \"$name\"")
+        }
+
+        // We need to make sure that all indexed backrefs exists. If not, they need to be
+        // reinterpreted as octal escapes
+        for ((mark, backref) in indexedBackrefs) {
+            if (backref.value >= nextGroupIndex) {
+                // Octal escape
+                val octalCodePoints = backref.codePoints.takeWhile { it in 0x30..0x37 /* 0-7 */ }.toIntArray()
+                mark.replace(CharOp(octalCodePoints.codePointsToString().toInt(radix = 8)))
+
+                // Check to see if there are any remaining non-octal digits
+                if (octalCodePoints.size != backref.codePoints.size) {
+                    val nonOctalCodePoints = backref.codePoints.drop(octalCodePoints.size)
+                    nonOctalCodePoints.asReversed().forEach {
+                        mark.insertAfter(CharOp(it))
+                    }
+                }
+            }
+        }
 
         return builder.build()
     }
@@ -196,22 +222,13 @@ class Parser(private val codePoints: IntArray, private val unicode: Boolean) {
                 +WordOp
             }
             in 0x30..0x39 /* 1-9 */ -> {
-                // Check for back reference, which would be in hex
-                var result = parseNumericValueAndLength(1, 3, base = 16)
-                if (result != null && result.first < nextGroupIndex) {
-                    cursor += result.second
-                    +BackReferenceOp(result.first)
-                } else {
-                    // Check for octal escape
-                    result = parseNumericValueAndLength(1, 3, base = 8)
-                    if (result == null) {
-                        cursor++
-                        +CharOp(codePoint)
-                    } else {
-                        cursor += result.second
-                        +CharOp(result.first)
-                    }
-                }
+                // Check for back reference, which would be in decimal. This could also be
+                // an octal escape, but that will be determined after the regexp is fully
+                // parsed (we don't know if this backref is valid yet)
+                val result = parseNumber(1, 3, base = 10) ?: unreachable()
+                result.consume()
+                indexedBackrefs.add(builder.mark() to result)
+                +BackReferenceOp(result.value)
             }
             0x75 /* u */ -> {
                 cursor++
@@ -220,11 +237,11 @@ class Parser(private val codePoints: IntArray, private val unicode: Boolean) {
                 // should parse as the character "u" followed by the characters "{zzzz}"
                 val codePoint = if (unicode && codePoint == 0x7b /* { */) {
                     cursor++
-                    parseNumericValue(1, 6, base = 16).also {
+                    parseNumber(1, 6, base = 16).also {
                         if (!consumeIf(0x7d /* } */))
                             error("Expected '}' to close unicode escape sequence")
-                    }
-                } else parseNumericValue(4, 4, base = 16)
+                    }?.value
+                } else parseNumber(4, 4, base = 16)?.value
 
                 if (codePoint == null)
                     error("Expected hexadecimal number")
@@ -239,7 +256,7 @@ class Parser(private val codePoints: IntArray, private val unicode: Boolean) {
             }
             0x78 /* x */ -> {
                 cursor++
-                +CharOp(parseNumericValue(2, 2, base = 16) ?: 0x78)
+                +CharOp(parseNumber(2, 2, base = 16)?.value ?: 0x78)
 
                 // Negate the cursor increment that comes after this loop
                 cursor--
@@ -265,7 +282,9 @@ class Parser(private val codePoints: IntArray, private val unicode: Boolean) {
             0x6b /* k */ -> {
                 cursor++
                 if (consumeIf(0x3c /* < */)) {
-                    +BackReferenceOp(parseName(endDelimiter = 0x3e /* > */))
+                    val name = parseName(endDelimiter = 0x3e /* > */)
+                    +BackReferenceOp(name)
+                    backrefNames.add(name)
                 } else {
                     +CharOp(0x6b)
                 }
@@ -366,13 +385,13 @@ class Parser(private val codePoints: IntArray, private val unicode: Boolean) {
                 val modifierMark = state.modifierMark
                 val numTargetOpcodes = builder.size - modifierMark.offset
 
-                val firstBound = parseNumericValue(1, 8, base = 10) ?: error("Expected number")
+                val firstBound = parseNumber(1, 8, base = 10)?.value ?: error("Expected number")
 
                 if (done)
                     error("Expected ',' or '}'")
 
                 val secondBound = if (consumeIf(0x2c /* , */)) {
-                    parseNumericValue(1, 8, base = 10)
+                    parseNumber(1, 8, base = 10)?.value
                 } else firstBound
 
                 if (!consumeIf(0x7d /* } */))
@@ -406,7 +425,13 @@ class Parser(private val codePoints: IntArray, private val unicode: Boolean) {
         return null
     }
 
-    private fun parseNumericValueAndLength(min: Int, max: Int, base: Int): Pair<Int, Int>? {
+    private inner class NumberInfo(val codePoints: IntArray, val value: Int) {
+        fun consume() {
+            cursor += codePoints.size
+        }
+    }
+
+    private fun parseNumber(min: Int, max: Int, base: Int): NumberInfo? {
         expect(min >= 0 && max <= 8)
         expect(base <= 16)
 
@@ -422,13 +447,7 @@ class Parser(private val codePoints: IntArray, private val unicode: Boolean) {
         if (numChars !in min..max)
             return null
 
-        return value to numChars
-    }
-
-    private fun parseNumericValue(min: Int, max: Int, base: Int): Int? {
-        val result = parseNumericValueAndLength(min, max, base) ?: return null
-        cursor += result.second
-        return result.first
+        return NumberInfo(codePoints.copyOfRange(cursor, cursor + numChars), value)
     }
 
     private fun parseName(endDelimiter: Int): String {
