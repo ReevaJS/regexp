@@ -41,11 +41,12 @@ class Matcher(
         val results = mutableListOf<MatchResult>()
 
         while (sourceIndex < source.size) {
-            val result = exec(MatchState(sourceIndex++, 0))
+            val result = exec(MatchState(sourceIndex, 0))
             if (result != null) {
                 results.add(result)
-                if (RegExp.Flag.Single in flags)
-                    return results
+                sourceIndex = result.groups[0].range.last
+            } else {
+                sourceIndex++
             }
         }
 
