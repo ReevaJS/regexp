@@ -8,7 +8,8 @@ class Matcher(
     private val flags: Set<RegExp.Flag>,
 ) {
     private val pendingStates = mutableListOf<MatchState>()
-    
+    private var negateNext = false
+
     fun match(startIndex: Int = 0): List<MatchResult>? {
         pendingStates.clear()
 
@@ -88,15 +89,15 @@ class Matcher(
                 ExecResult.Continue
             }
             is CharOp -> {
-                if (!state.done && state.codePoint == op.codePoint) {
+                if (checkCondition(!state.done && state.codePoint == op.codePoint)) {
                     state.advanceSource()
                     state.advanceOp()
                     ExecResult.Continue
                 } else ExecResult.Fail
             }
             is CharClassOp -> {
-                val start = state.opcodeCursor
                 state.advanceOp()
+                val start = state.opcodeCursor
 
                 for (i in 0 until op.numEntries) {
                     if (execOp(state, opcodes[state.opcodeCursor + i]) == ExecResult.Continue) {
@@ -108,7 +109,7 @@ class Matcher(
                 return ExecResult.Fail
             }
             is CharRangeOp -> {
-                if (!state.done && state.codePoint in op.start..op.end) {
+                if (checkCondition(!state.done && state.codePoint in op.start..op.end)) {
                     state.advanceSource()
                     state.advanceOp()
                     ExecResult.Continue
@@ -116,14 +117,13 @@ class Matcher(
             }
             NegateNextOp -> {
                 state.advanceOp()
-                when (execOp(state)) {
-                    ExecResult.Match -> unreachable()
-                    ExecResult.Continue -> ExecResult.Fail
-                    ExecResult.Fail -> ExecResult.Continue
+                negateNext = true
+                execOp(state).also {
+                    negateNext = false
                 }
             }
             WordOp -> {
-                if (!state.done && isWordCodepoint(state.codePoint)) {
+                if (checkCondition(!state.done && isWordCodepoint(state.codePoint))) {
                     state.advanceSource()
                     state.advanceOp()
                     ExecResult.Continue
@@ -136,20 +136,20 @@ class Matcher(
 
                 val currentIsWord = !state.done && isWordCodepoint(state.codePoint)
 
-                if (lastIsWord != currentIsWord) {
+                if (checkCondition(lastIsWord != currentIsWord)) {
                     state.advanceOp()
                     ExecResult.Continue
                 } else ExecResult.Fail
             }
             DigitOp -> {
-                if (!state.done && state.codePoint in 0x30..0x39 /* 0-9 */) {
+                if (checkCondition(!state.done && state.codePoint in 0x30..0x39 /* 0-9 */)) {
                     state.advanceSource()
                     state.advanceOp()
                     ExecResult.Continue
                 } else ExecResult.Fail
             }
             WhitespaceOp -> {
-                if (!state.done && isWhitespaceCodepoint(state.codePoint)) {
+                if (checkCondition(!state.done && isWhitespaceCodepoint(state.codePoint))) {
                     state.advanceSource()
                     state.advanceOp()
                     ExecResult.Continue
@@ -160,7 +160,7 @@ class Matcher(
                     UnicodeSet("[\\p{${op.class_}}]").freeze()
                 }
 
-                if (!state.done && state.codePoint in set) {
+                if (checkCondition(!state.done && state.codePoint in set)) {
                     state.advanceSource()
                     state.advanceOp()
                     ExecResult.Continue
@@ -170,32 +170,39 @@ class Matcher(
                 val content = state.groupContents[op.index]?.codePoints ?: TODO()
 
                 val startCursor = state.sourceCursor
-                if (startCursor + content.size > source.size)
-                    return ExecResult.Fail
 
-                for (i in content.indices) {
-                    if (content[i] != source[startCursor + i])
-                        return ExecResult.Fail
+                val matched = run {
+                    if (startCursor + content.size > source.size)
+                        return@run false
+
+                    for (i in content.indices) {
+                        if (content[i] != source[startCursor + i])
+                            return@run false
+                    }
+
+                    true
                 }
 
-                state.advanceOp()
-                state.advanceSource(content.size)
-                ExecResult.Continue
+                if (checkCondition(matched)) {
+                    state.advanceOp()
+                    state.advanceSource(content.size)
+                    ExecResult.Continue
+                } else ExecResult.Fail
             }
             StartOp -> {
-                if (state.sourceCursor == 0) {
+                if (checkCondition(state.sourceCursor == 0)) {
                     state.advanceOp()
                     ExecResult.Continue
                 } else ExecResult.Fail
             }
             EndOp -> {
-                if (state.sourceCursor == source.size) {
+                if (checkCondition(state.sourceCursor == source.size)) {
                     state.advanceOp()
                     ExecResult.Continue
                 } else ExecResult.Fail
             }
             AnyOp -> {
-                if (state.sourceCursor < source.size) {
+                if (checkCondition(state.sourceCursor < source.size)) {
                     state.advanceSource()
                     state.advanceOp()
                     ExecResult.Continue
@@ -221,6 +228,7 @@ class Matcher(
                 ExecResult.Continue
             }
             is LookOp -> {
+                expect(!negateNext)
                 state.advanceOp()
 
                 var newState = MatchState(state.sourceCursor, 0)
@@ -267,6 +275,9 @@ class Matcher(
     // TODO: Are these the only characters? Does unicode mode change this?
     private fun isWhitespaceCodepoint(cp: Int): Boolean =
         cp == 0x20 /* <space> */ || cp == 0x9 /* <tab> */ || cp == 0xa /* <new line> */ || cp == 0xd /* <carriage return> */
+
+    // Simple function that makes the intent a bit more clear. Easier to read than (a == b) != negateNext
+    private fun checkCondition(condition: Boolean) = condition != negateNext
 
     private enum class ExecResult {
         Match,
