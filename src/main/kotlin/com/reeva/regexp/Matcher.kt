@@ -177,13 +177,16 @@ class Matcher(
                 val content = state.groupContents[op.index]?.codepoints ?: TODO()
 
                 val startCursor = state.sourceCursor
-                for (i in 0 until content.size) {
+                if (startCursor + content.size > source.size)
+                    return ExecResult.Fail
+
+                for (i in content.indices) {
                     if (content[i] != source[startCursor + i])
                         return ExecResult.Fail
                 }
 
                 state.advanceOp()
-                state.sourceCursor += content.size
+                state.advanceSource(content.size)
                 ExecResult.Continue
             }
             StartOp -> {
@@ -295,11 +298,13 @@ class Matcher(
     private val MatchState.op: Opcode
         get() = opcodes[opcodeCursor]
 
-    private fun MatchState.advanceSource() {
-        groups.forEach {
-            it.content.add(source[sourceCursor])
+    private fun MatchState.advanceSource(n: Int = 1) {
+        repeat(n) {
+            groups.forEach {
+                it.content.add(source[sourceCursor])
+            }
+            sourceCursor++
         }
-        sourceCursor++
     }
     
     private class MatchState(
