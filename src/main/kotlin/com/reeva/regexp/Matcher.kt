@@ -108,6 +108,22 @@ class Matcher(
 
                 return ExecResult.Fail
             }
+            is InvertedCharClassOp -> {
+                state.advanceOp()
+
+                expect(!negateNext)
+
+                for (i in 0 until op.numEntries) {
+                    if (execOp(state.copy(), opcodes[state.opcodeCursor + i]) == ExecResult.Continue) {
+                        return ExecResult.Fail
+                    }
+                }
+
+                state.opcodeCursor += op.numEntries
+                state.advanceSource()
+
+                return ExecResult.Continue
+            }
             is CharRangeOp -> {
                 if (checkCondition(!state.done && state.codePoint in op.start..op.end)) {
                     state.advanceSource()

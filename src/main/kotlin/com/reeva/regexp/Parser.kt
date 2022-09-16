@@ -109,16 +109,19 @@ class Parser(private val codePoints: IntArray, private val unicode: Boolean) {
                 cursor++
                 state.modifierMark = builder.mark()
 
-                val ops = mutableListOf<Opcode>()
-
-                if (codePoint == 0x5e /* ^ */) {
+                val charClassOp = if (codePoint == 0x5e /* ^ */) {
                     cursor++
-                    +NegateNextOp
-                }
+                    ::InvertedCharClassOp
+                } else ::CharClassOp
+
+                val previousBuilder = builder
+                builder = OpcodeBuilder()
 
                 while (!done && codePoint != 0x5d /* ] */) {
-                    if (codePoint == 0x5c /* \ */)
-                        TODO()
+                    if (codePoint == 0x5c /* \ */) {
+                        parseEscape(inCharClass = true)
+                        continue
+                    }
 
                     val start = codePoint
                     cursor++
@@ -130,9 +133,9 @@ class Parser(private val codePoints: IntArray, private val unicode: Boolean) {
                         if (start > end)
                             error("Character class range is out-of-order")
 
-                        ops.add(CharRangeOp(start, end))
+                        +CharRangeOp(start, end)
                     } else {
-                        ops.add(CharOp(start))
+                        +CharOp(start)
                     }
                 }
 
@@ -141,8 +144,11 @@ class Parser(private val codePoints: IntArray, private val unicode: Boolean) {
 
                 cursor++
 
-                +CharClassOp(ops.size)
-                ops.forEach { +it }
+                val ops = builder.build()
+                builder = previousBuilder
+
+                +charClassOp(ops.size)
+                builder.addOpcodes(ops.toList())
             }
             0x5c /* \ */ -> parseEscape(inCharClass = false)
             0x5e /* ^ */ -> {

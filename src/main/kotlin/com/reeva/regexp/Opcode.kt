@@ -14,6 +14,10 @@ class CharClassOp(val numEntries: Int) : Opcode() {
     override fun toString() = "CharClass($numEntries)"
 }
 
+class InvertedCharClassOp(val numEntries: Int) : Opcode() {
+    override fun toString() = "InvertedCharClass($numEntries)"
+}
+
 // Used for character classes
 class CharRangeOp(val start: Int, val end: Int) : Opcode()  {
     override fun toString() = "CharRange($start-$end)"
