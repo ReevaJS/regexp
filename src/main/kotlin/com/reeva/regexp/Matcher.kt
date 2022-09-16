@@ -58,7 +58,6 @@ class Matcher(
         while (true) {
             when (execOp(state)) {
                 ExecResult.Match -> {
-                    @Suppress("UNCHECKED_CAST")
                     val indexedGroups = state.groupContents.toList()
                         .filter { it.first is Int }                        
                         .sortedBy { it.first as Int }
@@ -107,7 +106,7 @@ class Matcher(
                 ExecResult.Continue
             }
             is CharOp -> {
-                if (state.codepoint == op.codepoint) {
+                if (!state.done && state.codepoint == op.codepoint) {
                     state.advanceSource()
                     state.advanceOp()
                     ExecResult.Continue
@@ -127,7 +126,7 @@ class Matcher(
                 return ExecResult.Fail
             }
             is CharRangeOp -> {
-                if (state.codepoint in op.start..op.end) {
+                if (!state.done && state.codepoint in op.start..op.end) {
                     state.advanceSource()
                     state.advanceOp()
                     ExecResult.Continue
@@ -142,7 +141,7 @@ class Matcher(
                 }
             }
             WordOp -> {
-                if (isWordCodepoint(state.codepoint)) {
+                if (!state.done && isWordCodepoint(state.codepoint)) {
                     state.advanceSource()
                     state.advanceOp()
                     ExecResult.Continue
@@ -153,7 +152,7 @@ class Matcher(
                     isWordCodepoint(source[state.sourceCursor - 1])
                 } else false
 
-                val currentIsWord = isWordCodepoint(state.codepoint)
+                val currentIsWord = !state.done && isWordCodepoint(state.codepoint)
 
                 if (lastIsWord != currentIsWord) {
                     state.advanceOp()
@@ -161,23 +160,21 @@ class Matcher(
                 } else ExecResult.Fail
             }
             DigitOp -> {
-                if (state.codepoint in 0x30..0x39 /* 0-9 */) {
+                if (!state.done && state.codepoint in 0x30..0x39 /* 0-9 */) {
                     state.advanceSource()
                     state.advanceOp()
                     ExecResult.Continue
                 } else ExecResult.Fail
             }
             WhitespaceOp -> {
-                if (isWhitespaceCodepoint(state.codepoint)) {
+                if (!state.done && isWhitespaceCodepoint(state.codepoint)) {
                     state.advanceSource()
                     state.advanceOp()
                     ExecResult.Continue
                 } else ExecResult.Fail
             }
             is BackReferenceOp -> {
-                val content = state.groupContents[op.index]?.codepoints
-                if (content == null)
-                    TODO() // Is this actually possible?
+                val content = state.groupContents[op.index]?.codepoints ?: TODO()
 
                 val startCursor = state.sourceCursor
                 for (i in 0 until content.size) {
@@ -289,11 +286,14 @@ class Matcher(
         fun copy() = GroupState(key, rangeStart, content.toMutableList())
     }
 
+    private val MatchState.done: Boolean
+        get() = sourceCursor > source.lastIndex
+
     private val MatchState.codepoint: Int
-        inline get() = source[sourceCursor]
+        get() = source[sourceCursor]
 
     private val MatchState.op: Opcode
-        inline get() = opcodes[opcodeCursor]
+        get() = opcodes[opcodeCursor]
 
     private fun MatchState.advanceSource() {
         groups.forEach {
