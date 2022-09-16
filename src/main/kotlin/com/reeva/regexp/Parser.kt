@@ -187,6 +187,7 @@ class Parser(private val codePoints: IntArray, private val unicode: Boolean) {
             0x74 /* t */ -> +CharOp(0x9)
             0x6e /* n */ -> +CharOp(0xa)
             0x76 /* v */ -> +CharOp(0xb)
+            0x72 /* r */ -> +CharOp(0xd)
             0x73 /* s */ -> +WhitespaceOp
             0x53 /* S */ -> {
                 +NegateNextOp
