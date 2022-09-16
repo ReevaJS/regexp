@@ -12,14 +12,25 @@ dependencies {
     implementation("org.jetbrains.kotlin:kotlin-stdlib-jdk8")
 }
 
-testing {
-    suites {
-        val test by getting(JvmTestSuite::class) {
-            useKotlinTest()
-        }
-    }
-}
-
 application {
     mainClass.set("com.reeva.regexp.AppKt")
+}
+
+tasks {
+    test {
+        useJUnitPlatform()
+    }
+
+    compileKotlin {
+        kotlinOptions {
+            jvmTarget = "1.8"
+            freeCompilerArgs = listOf("-Xinline-classes", "-Xopt-in=kotlin.RequiresOptIn")
+        }
+    }
+
+    compileTestKotlin {
+        kotlinOptions {
+            jvmTarget = "1.8"
+        }
+    }
 }
