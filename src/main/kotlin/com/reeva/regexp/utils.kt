@@ -28,3 +28,5 @@ fun expect(condition: Boolean, messageProvider: () -> String) {
 }
 
 class ExpectationError(message: String) : Exception(message)
+
+fun IntArray.codePointsToString() = buildString { forEach(::appendCodePoint) }

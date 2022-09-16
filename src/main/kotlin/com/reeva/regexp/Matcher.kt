@@ -4,9 +4,7 @@ class MatchGroup(
     val codepoints: IntArray,
     val range: IntRange,
 ) {
-    val value = buildString {
-        codepoints.forEach(::appendCodePoint)
-    }
+    val value = codepoints.codePointsToString()
 
     fun copy() = MatchGroup(codepoints.copyOf(), range)
 
