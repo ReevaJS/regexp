@@ -27,6 +27,7 @@ class Matcher(
             if (result != null) {
                 results.add(result)
                 sourceIndex = result.groups[0].range.last + 1
+                pendingStates.clear()
             } else {
                 sourceIndex++
             }
