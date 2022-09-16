@@ -82,7 +82,6 @@ class Matcher(
             is EndGroupOp -> {
                 val groupState = state.groups.removeLast()
                 if (groupState.key != null) {
-                    expect(groupState.key !in state.groupContents)
                     state.groupContents[groupState.key] = MatchGroup(
                         groupState.content.toIntArray(),
                         groupState.rangeStart until state.sourceCursor,
