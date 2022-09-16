@@ -269,6 +269,9 @@ class Parser(private val codePoints: IntArray, private val unicode: Boolean) {
                 } else {
                     +CharOp(0x6b)
                 }
+
+                // Negate the cursor increment that comes after this loop
+                cursor--
             }
             else -> +CharOp(codePoint)
         }
@@ -458,9 +461,9 @@ class Parser(private val codePoints: IntArray, private val unicode: Boolean) {
     }
 
     private fun consumeIf(vararg codePoints: Int): Boolean {
-        if (cursor + codePoints.size >= this.codePoints.lastIndex)
+        if (cursor + codePoints.size > this.codePoints.size)
             return false
-
+        
         for ((i, cp) in codePoints.withIndex()) {
             if (this.codePoints[cursor + i] != cp)
                 return false
