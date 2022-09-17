@@ -111,6 +111,9 @@ class Matcher(
                 return ExecResult.Fail
             }
             is InvertedCharClassOp -> {
+                if (state.done)
+                    return ExecResult.Fail
+
                 state.advanceOp()
 
                 expect(!negateNext)
