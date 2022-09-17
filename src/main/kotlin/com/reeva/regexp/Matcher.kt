@@ -18,9 +18,13 @@ class Matcher(
         var index = startIndex
 
         while (index < source.size) {
-            val result = match(index) ?: continue
-            yield(result)
-            index = max(index + 1, result.indexedGroups[0].range.last + 1)
+            val result = match(index)
+            if (result != null) {
+                yield(result)
+                index = max(index + 1, result.indexedGroups[0]!!.range.last + 1)
+            } else {
+                index++
+            }
         }
     }
 
