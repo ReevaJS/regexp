@@ -1,8 +1,10 @@
 package com.reeva.regexp
 
-internal class OpcodeBuilder {
+internal class ParserState {
     private val opcodes = mutableListOf<Opcode>()
     private val marks = mutableMapOf<Int, Mark>()
+    var alternationMark: ParserState.Mark = mark()
+    var modifierMark: ParserState.Mark = mark()
 
     val size: Int
         get() = opcodes.size
@@ -48,7 +50,7 @@ internal class OpcodeBuilder {
         opcodes.add(index, opcode)
     }
 
-    fun merge(other: OpcodeBuilder) {
+    fun merge(other: ParserState) {
         other.marks.values.forEach {
             val newOffset = it.offset + opcodes.size
             expect(newOffset !in marks)

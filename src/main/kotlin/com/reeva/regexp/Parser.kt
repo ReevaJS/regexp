@@ -1,15 +1,14 @@
 package com.reeva.regexp
 
 class Parser(private val codePoints: IntArray, private val unicode: Boolean) {
-    private var builder = OpcodeBuilder()
     private var nextGroupIndex = 0
     private var cursor = 0
     private val groupNames = mutableSetOf<String>()
     private val backrefNames = mutableSetOf<String>()
-    private val indexedBackrefs = mutableListOf<Pair<OpcodeBuilder.Mark, NumberInfo>>()
+    private val indexedBackrefs = mutableListOf<Pair<ParserState.Mark, NumberInfo>>()
 
-    private val states = mutableListOf<State>()
-    private val state: State
+    private val states = mutableListOf<ParserState>()
+    private val state: ParserState
         get() = states.last()
 
     private val codePoint: Int
@@ -21,7 +20,7 @@ class Parser(private val codePoints: IntArray, private val unicode: Boolean) {
     constructor(source: String, unicode: Boolean) : this(source.codePoints().toArray(), unicode)
 
     fun parse(): Array<Opcode> {
-        states.add(State())
+        states.add(ParserState())
 
         // The entire match is implicitly group 0
         +StartGroupOp(nextGroupIndex++, name = null)
@@ -58,7 +57,7 @@ class Parser(private val codePoints: IntArray, private val unicode: Boolean) {
             }
         }
 
-        return builder.build()
+        return state.build()
     }
 
     private fun parseSingle() {
@@ -73,11 +72,10 @@ class Parser(private val codePoints: IntArray, private val unicode: Boolean) {
             0x28 /* ( */ -> {
                 cursor++
 
-                states.add(State())
+                state.modifierMark = state.mark()
+                states.add(ParserState())
 
                 // TODO: This is very ugly
-                val previousBuilder = builder
-                builder = OpcodeBuilder()
                 var lookOp: ((Array<Opcode>) -> LookOp)? = null
 
                 when {
@@ -96,7 +94,7 @@ class Parser(private val codePoints: IntArray, private val unicode: Boolean) {
                     else -> +StartGroupOp(nextGroupIndex++, name = null)
                 }
 
-                state.alternationMark = builder.mark()
+                state.alternationMark = state.mark()
 
                 while (!done && codePoint != 0x29 /* ) */)
                     parseSingle()
@@ -104,32 +102,28 @@ class Parser(private val codePoints: IntArray, private val unicode: Boolean) {
                 if (!consumeIf(0x29 /* ) */))
                     error("Expected ')'")
 
-                states.removeLast()
-
                 if (lookOp != null)
                     +MatchOp
 
-                val ops = builder.build()
-                builder = previousBuilder
+                val groupState = states.removeLast()
 
                 if (lookOp != null) {
-                    +lookOp(ops)
+                    +lookOp(groupState.build())
                 } else {
-                    builder.addOpcodes(ops.toList())
+                    state.merge(groupState)
                     +EndGroupOp
                 }
             }
             0x5b /* [ */ -> {
                 cursor++
-                state.modifierMark = builder.mark()
+                state.modifierMark = state.mark()
 
                 val charClassOp = if (codePoint == 0x5e /* ^ */) {
                     cursor++
                     ::InvertedCharClassOp
                 } else ::CharClassOp
 
-                val previousBuilder = builder
-                builder = OpcodeBuilder()
+                states.add(ParserState())
 
                 while (!done && codePoint != 0x5d /* ] */) {
                     if (codePoint == 0x5c /* \ */) {
@@ -156,33 +150,31 @@ class Parser(private val codePoints: IntArray, private val unicode: Boolean) {
                 if (!consumeIf(0x5d /* ] */))
                     error("Expected closing ']'")
 
-                val ops = builder.build()
-                builder = previousBuilder
-
-                +charClassOp(ops.size)
-                builder.addOpcodes(ops.toList())
+                val classState = states.removeLast()
+                +charClassOp(classState.size)
+                state.merge(classState)
             }
             0x5c /* \ */ -> parseEscape(inCharClass = false)
             0x5e /* ^ */ -> {
                 cursor++
-                state.modifierMark = builder.mark()
+                state.modifierMark = state.mark()
                 +StartOp
             }
             0x24 /* $ */ -> {
                 cursor++
-                state.modifierMark = builder.mark()
+                state.modifierMark = state.mark()
                 +EndOp
             }
             0x2e /* . */ -> {
                 cursor++
-                state.modifierMark = builder.mark()
+                state.modifierMark = state.mark()
                 +AnyOp
             }
             else -> {
                 if (codePoint in charsThatRequireEscape)
                     error("Unescaped \"${codePoint.toChar()}\"")
 
-                state.modifierMark = builder.mark()
+                state.modifierMark = state.mark()
                 +CharOp(codePoint).also { cursor++ }
             }
         }
@@ -193,7 +185,7 @@ class Parser(private val codePoints: IntArray, private val unicode: Boolean) {
         if (done)
             error("RegExp cannot end with a backslash")
 
-        state.modifierMark = builder.mark()
+        state.modifierMark = state.mark()
 
         when (codePoint) {
             0x74 /* t */ -> +CharOp(0x9)
@@ -228,7 +220,7 @@ class Parser(private val codePoints: IntArray, private val unicode: Boolean) {
                 // parsed (we don't know if this backref is valid yet)
                 val result = parseNumber(1, 3, base = 10) ?: unreachable()
                 result.consume()
-                indexedBackrefs.add(builder.mark() to result)
+                indexedBackrefs.add(state.mark() to result)
                 +BackReferenceOp(result.value)
             }
             0x75 /* u */ -> {
@@ -311,12 +303,12 @@ class Parser(private val codePoints: IntArray, private val unicode: Boolean) {
                  */
 
                 val modifierMark = state.modifierMark
-                val numTargetOpcodes = builder.size - modifierMark.offset
+                val numTargetOpcodes = state.size - modifierMark.offset
 
                 val op = if (lazy) ::ForkNow else ::Fork
                 modifierMark.insertBefore(op(numTargetOpcodes + 1))
 
-                state.modifierMark = builder.mark()
+                state.modifierMark = state.mark()
             }
             0x2a /* * */ -> {
                 cursor++
@@ -329,7 +321,7 @@ class Parser(private val codePoints: IntArray, private val unicode: Boolean) {
                  */
 
                 val modifierMark = state.modifierMark
-                val numTargetOpcodes = builder.size - modifierMark.offset
+                val numTargetOpcodes = state.size - modifierMark.offset
 
                 val firstOp = if (lazy) ::ForkNow else ::Fork
                 val secondOp = if (lazy) ::Fork else ::ForkNow
@@ -337,7 +329,7 @@ class Parser(private val codePoints: IntArray, private val unicode: Boolean) {
                 modifierMark.insertBefore(firstOp(numTargetOpcodes + 2)) // Skip 'secondOp'
                 +secondOp(-numTargetOpcodes)
 
-                state.modifierMark = builder.mark()
+                state.modifierMark = state.mark()
             }
             0x2b /* + */ -> {
                 cursor++
@@ -348,11 +340,11 @@ class Parser(private val codePoints: IntArray, private val unicode: Boolean) {
                  * Fork/ForkNow -X
                  */
 
-                val numTargetOpcodes = builder.size - state.modifierMark.offset
+                val numTargetOpcodes = state.size - state.modifierMark.offset
                 val op = if (lazy) ::Fork else ::ForkNow
                 +op(-numTargetOpcodes)
 
-                state.modifierMark = builder.mark()
+                state.modifierMark = state.mark()
             }
             0x7c /* | */ -> {
                 cursor++
@@ -365,11 +357,11 @@ class Parser(private val codePoints: IntArray, private val unicode: Boolean) {
                  */
 
                 val alternationMark = state.alternationMark
-                val numTargetOpcodes = builder.size - alternationMark.offset
+                val numTargetOpcodes = state.size - alternationMark.offset
 
                 alternationMark.insertBefore(Fork(numTargetOpcodes + 2)) // Skip the jump
                 +Jump(numTargetOpcodes)
-                state.alternationMark = builder.mark()
+                state.alternationMark = state.mark()
             }
             0x7b /* { */ -> {
                 cursor++
@@ -384,7 +376,7 @@ class Parser(private val codePoints: IntArray, private val unicode: Boolean) {
                  */
 
                 val modifierMark = state.modifierMark
-                val numTargetOpcodes = builder.size - modifierMark.offset
+                val numTargetOpcodes = state.size - modifierMark.offset
 
                 val firstBound = parseNumber(1, 8, base = 10)?.value ?: error("Expected number")
 
@@ -497,12 +489,7 @@ class Parser(private val codePoints: IntArray, private val unicode: Boolean) {
 
     private fun error(message: String): Nothing = throw RegexSyntaxError(message, cursor)
 
-    private operator fun Opcode.unaryPlus() = builder.addOpcode(this)
-
-    private inner class State(
-        var alternationMark: OpcodeBuilder.Mark = builder.mark(),
-        var modifierMark: OpcodeBuilder.Mark = builder.mark(),
-    )
+    private operator fun Opcode.unaryPlus() = state.addOpcode(this)
 
     companion object {
         private val charsThatRequireEscape = setOf(
