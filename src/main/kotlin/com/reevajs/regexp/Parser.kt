@@ -523,7 +523,7 @@ class Parser(private val codePoints: IntArray, private val unicode: Boolean) {
 
     companion object {
         private val charsThatRequireEscape = setOf(
-            '*', '?', '(', ')', '[', '/'
+            '+', '*', '?', '(', ')', '[', '/'
         ).map(Char::code)
     }
 }
