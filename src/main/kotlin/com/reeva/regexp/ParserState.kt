@@ -48,8 +48,14 @@ internal class OpcodeBuilder {
         opcodes.add(index, opcode)
     }
 
-    fun addOpcodes(opcodes: List<Opcode>) {
-        this.opcodes.addAll(opcodes)
+    fun merge(other: OpcodeBuilder) {
+        other.marks.values.forEach {
+            val newOffset = it.offset + opcodes.size
+            expect(newOffset !in marks)
+            marks[newOffset] = it
+            it.offset = newOffset
+        }
+        this.opcodes.addAll(other.opcodes)
     }
 
     inner class Mark(var offset: Int) {
@@ -66,5 +72,7 @@ internal class OpcodeBuilder {
         fun replace(opcode: Opcode) {
             opcodes[offset] = opcode
         }
+
+        override fun toString() = "Mark($offset)"
     }
 }

@@ -1,6 +1,7 @@
 package com.reeva.regexp
 
 import com.ibm.icu.text.UnicodeSet
+import kotlin.math.max
 
 @Suppress("MemberVisibilityCanBePrivate")
 class Matcher(
@@ -17,9 +18,9 @@ class Matcher(
         var index = startIndex
 
         while (index < source.size) {
-            val result = match(index++) ?: continue
+            val result = match(index) ?: continue
             yield(result)
-            index = result.indexedGroups[0].range.last + 1
+            index = max(index + 1, result.indexedGroups[0].range.last + 1)
         }
     }
 
