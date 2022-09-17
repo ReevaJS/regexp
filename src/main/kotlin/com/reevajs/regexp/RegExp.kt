@@ -3,9 +3,11 @@ package com.reevajs.regexp
 
 @Suppress("unused", "MemberVisibilityCanBePrivate")
 class RegExp(
-    private val regexCodePoints: IntArray, 
+    regexCodePoints: IntArray,
     private val flags: Set<Flag>,
 ) {
+    private val opcodes = Parser(regexCodePoints, unicode = Flag.Unicode in flags).parse()
+
     constructor(regex: String, vararg flags: Flag) : this(regex.codePoints().toArray(), flags.toSet()) 
 
     fun test(codePoints: IntArray) = match(codePoints) != null
@@ -17,8 +19,6 @@ class RegExp(
     fun match(text: String) = match(text.codePoints().toArray())
 
     fun matcher(codePoints: IntArray): Matcher {
-        val opcodes = Parser(regexCodePoints, unicode = Flag.Unicode in flags).parse()
-        opcodes.forEach(::println)
         return Matcher(codePoints, opcodes, flags)
     }
 
