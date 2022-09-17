@@ -3,8 +3,8 @@ package com.reevajs.regexp
 
 @Suppress("unused", "MemberVisibilityCanBePrivate")
 class RegExp(
-    regexCodePoints: IntArray,
-    private val flags: Set<Flag>,
+    val regexCodePoints: IntArray,
+    val flags: Set<Flag>,
 ) {
     private val opcodes = Parser(regexCodePoints, unicode = Flag.Unicode in flags).parse()
 
