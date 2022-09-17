@@ -73,7 +73,6 @@ class Parser(private val codePoints: IntArray, private val unicode: Boolean) {
             0x28 /* ( */ -> {
                 cursor++
 
-                state.modifierMark = builder.mark()
                 states.add(State())
 
                 // TODO: This is very ugly
@@ -96,6 +95,8 @@ class Parser(private val codePoints: IntArray, private val unicode: Boolean) {
                     }
                     else -> +StartGroupOp(nextGroupIndex++, name = null)
                 }
+
+                state.alternationMark = builder.mark()
 
                 while (!done && codePoint != 0x29 /* ) */)
                     parseSingle()
@@ -367,7 +368,7 @@ class Parser(private val codePoints: IntArray, private val unicode: Boolean) {
                 val numTargetOpcodes = builder.size - alternationMark.offset
 
                 alternationMark.insertBefore(Fork(numTargetOpcodes + 2)) // Skip the jump
-                +Jump(numTargetOpcodes + 1)
+                +Jump(numTargetOpcodes)
                 state.alternationMark = builder.mark()
             }
             0x7b /* { */ -> {
