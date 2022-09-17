@@ -1,5 +1,5 @@
 
-package com.reeva.regexp
+package com.reevajs.regexp
 
 @Suppress("unused", "MemberVisibilityCanBePrivate")
 class RegExp(
@@ -18,6 +18,7 @@ class RegExp(
 
     fun matcher(codePoints: IntArray): Matcher {
         val opcodes = Parser(regexCodePoints, unicode = Flag.Unicode in flags).parse()
+        opcodes.forEach(::println)
         return Matcher(codePoints, opcodes, flags)
     }
 

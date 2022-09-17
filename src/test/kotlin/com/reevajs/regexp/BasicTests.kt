@@ -1,4 +1,4 @@
-package com.reeva.regexp
+package com.reevajs.regexp
 
 import org.intellij.lang.annotations.Language
 import org.junit.jupiter.params.ParameterizedTest
@@ -12,6 +12,7 @@ object BasicTests {
     @Suppress("SpellCheckingInspection")
     @JvmStatic
     fun tests() = TestBuilder().apply {
+        // Forward-capturing group
         testMatches("\\k<a>(?<a>x)", "x") {
             match {
                 this[0] = "x" spanned 0..0
@@ -20,6 +21,7 @@ object BasicTests {
             }
         }
 
+        // Basic named capturing group
         testMatches("(?<name>foo)(bar)+", "foobarbarbar") {
             match {
                 this[0] = "foobarbarbar" spanned 0..11
@@ -29,11 +31,42 @@ object BasicTests {
             }
         }
 
+        // Missing indexed group
         testMatches("(a)|(b)", "b") {
             match {
                 this[0] = "b" spanned 0..0
                 this[2] = "b" spanned 0..0
             }
+        }
+
+        // Matching until end of input
+        testMatches("\\S+", "abcdefg") {
+            match {
+                this[0] = "abcdefg" spanned 0..6
+            }
+        }
+
+        // Negated entry in char class
+        testMatches("[\\S]+", "abcdefg") {
+            match {
+                this[0] = "abcdefg" spanned 0..6
+            }
+        }
+
+        // Complex class based test
+        testMatches("""([\S]+([ \t]+[\S]+)*)[ \t]*=[ \t]*[\S]+""", "Test_Key = Value") {
+            match {
+                this[0] = "Test_Key = Value" spanned 0..15
+                this[1] = "Test_Key" spanned 0..7
+            }
+        }
+
+        // Empty match
+        testMatches("(?:)", "abc") {
+            match { this[0] = "" spanned IntRange(0, -1) }
+            match { this[0] = "" spanned IntRange(1, 0) }
+            match { this[0] = "" spanned IntRange(2, 1) }
+            match { this[0] = "" spanned IntRange(3, 2) }
         }
     }.tests
 

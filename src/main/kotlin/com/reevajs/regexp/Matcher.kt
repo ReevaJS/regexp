@@ -1,4 +1,4 @@
-package com.reeva.regexp
+package com.reevajs.regexp
 
 import com.ibm.icu.text.UnicodeSet
 import java.util.TreeMap
@@ -67,6 +67,8 @@ class Matcher(
     }
 
     private fun execOp(state: MatchState, op: Opcode = state.op): ExecResult {
+        println("State: $state, op: $op")
+
         if (state.sourceCursor > source.size)
             return ExecResult.Fail
 

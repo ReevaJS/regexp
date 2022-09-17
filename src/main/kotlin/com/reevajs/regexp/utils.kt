@@ -1,4 +1,4 @@
-package com.reeva.regexp
+package com.reevajs.regexp
 
 import kotlin.contracts.ExperimentalContracts
 import kotlin.contracts.contract

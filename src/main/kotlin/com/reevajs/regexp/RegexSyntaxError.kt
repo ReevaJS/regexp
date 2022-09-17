@@ -1,4 +1,4 @@
-package com.reeva.regexp
+package com.reevajs.regexp
 
 import java.lang.Exception
 

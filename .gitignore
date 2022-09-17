@@ -224,6 +224,6 @@ gradle-app.setting
 
 # End of https://www.toptal.com/developers/gitignore/api/kotlin,java,maven,gradle,intellij,visualstudiocode
 
-src/main/kotlin/com/reeva/regexp/App.kt
+src/main/kotlin/com/reevajs/regexp/App.kt
 .vscode
 bin/

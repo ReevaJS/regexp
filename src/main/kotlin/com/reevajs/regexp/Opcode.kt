@@ -1,4 +1,4 @@
-package com.reeva.regexp
+package com.reevajs.regexp
 
 sealed class Opcode
 

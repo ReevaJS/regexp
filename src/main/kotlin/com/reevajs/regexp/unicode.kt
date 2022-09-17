@@ -1,4 +1,4 @@
-package com.reeva.regexp
+package com.reevajs.regexp
 
 @Suppress("SpellCheckingInspection")
 val unicodePropertyAliasList = mapOf(

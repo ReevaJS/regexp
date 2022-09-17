@@ -1,4 +1,4 @@
-package com.reeva.regexp
+package com.reevajs.regexp
 
 class Parser(private val codePoints: IntArray, private val unicode: Boolean) {
     private var nextGroupIndex = 0

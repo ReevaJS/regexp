@@ -1,4 +1,4 @@
-package com.reeva.regexp
+package com.reevajs.regexp
 
 internal class ParserState {
     private val opcodes = mutableListOf<Opcode>()
