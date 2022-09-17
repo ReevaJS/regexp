@@ -18,7 +18,7 @@ class Matcher(
     fun matchSequence(startIndex: Int = 0): Sequence<MatchResult> = sequence {
         var index = startIndex
 
-        while (index < source.size) {
+        while (index <= source.size) {
             val result = match(index)
             if (result != null) {
                 yield(result)
@@ -67,6 +67,9 @@ class Matcher(
     }
 
     private fun execOp(state: MatchState, op: Opcode = state.op): ExecResult {
+        if (state.sourceCursor > source.size)
+            return ExecResult.Fail
+
         return when (op) {
             is StartGroupOp -> {
                 state.groups.add(GroupState(op.index, op.name, state.sourceCursor))
