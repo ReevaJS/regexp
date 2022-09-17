@@ -61,7 +61,6 @@ class Matcher(
     }
 
     private fun execOp(state: MatchState, op: Opcode = state.op): ExecResult {
-        println("State: $state, op: $op")
         return when (op) {
             is StartGroupOp -> {
                 state.groups.add(GroupState(op.index, op.name, state.sourceCursor))
