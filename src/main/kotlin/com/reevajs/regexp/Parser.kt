@@ -417,6 +417,9 @@ class Parser(private val codePoints: IntArray, private val unicode: Boolean) {
             parseNumber(1, 8, base = 10)?.value
         } else firstBound
 
+        if (secondBound != null && secondBound > firstBound)
+            error("Quantifier range is out of order")
+
         if (!consumeIf(0x7d /* } */))
             return incomplete()
 
