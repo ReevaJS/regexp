@@ -408,13 +408,19 @@ class Parser(private val codePoints: IntArray, private val unicode: Boolean) {
         val modifierMark = state.modifierMark
         val numTargetOpcodes = state.size - modifierMark.offset
 
-        val firstBound = parseNumber(1, 8, base = 10)?.value ?: return incomplete()
+        val firstBound = parseNumber(1, 8, base = 10)?.let {
+            it.consume()
+            it.value
+        } ?: return incomplete()
 
         if (done)
             return incomplete()
 
         val secondBound = if (consumeIf(0x2c /* , */)) {
-            parseNumber(1, 8, base = 10)?.value
+            parseNumber(1, 8, base = 10)?.let {
+                it.consume()
+                it.value
+            }
         } else firstBound
 
         if (secondBound != null && secondBound > firstBound)
