@@ -229,28 +229,8 @@ class Parser(private val codePoints: IntArray, private val unicode: Boolean) {
                 +BackReferenceOp(result.value)
             }
             0x75 /* u */ -> {
-                cursor++
-
-                // TODO: This isn't quite correct for invalid hex. For example, "\u{zzzz}"
-                // should parse as the character "u" followed by the characters "{zzzz}"
-                val codePoint = if (unicode && codePoint == 0x7b /* { */) {
-                    cursor++
-                    parseNumber(1, 6, base = 16).also {
-                        if (!consumeIf(0x7d /* } */))
-                            error("Expected '}' to close unicode escape sequence")
-                    }?.value
-                } else parseNumber(4, 4, base = 16)?.value
-
-                if (codePoint == null)
-                    error("Expected hexadecimal number")
-
-                if (codePoint >= 0x10ffff)
-                    error("Codepoint ${codePoint.toString(radix = 16)} is too large")
-
-                +CharOp(codePoint)
-
-                // Negate the cursor increment that comes after this loop
-                cursor--
+                parseUnicodeEscapeSequence()
+                return
             }
             0x78 /* x */ -> {
                 cursor++
@@ -294,6 +274,44 @@ class Parser(private val codePoints: IntArray, private val unicode: Boolean) {
         }
 
         cursor++
+    }
+
+    private fun parseUnicodeEscapeSequence() {
+        expect(codePoint == 0x75 /* u */)
+        cursor++
+
+        val start = cursor
+
+        fun incomplete() {
+            if (unicode)
+                error("Incomplete unicode escape sequence")
+            cursor = start
+            +CharOp(0x75 /* u */)
+        }
+
+        if (done)
+            return incomplete()
+
+        if (consumeIf(0x7b /* { */)) {
+            val numberInfo = parseNumber(1, Int.MAX_VALUE, base = 16) ?: return incomplete()
+            if (numberInfo.value > 0x10ffff)
+                error("Invalid unicode escape sequence; codepoint is greater than the max value of 0x10ffff")
+
+            numberInfo.consume()
+
+            if (done || codePoint != 0x7d /* } */)
+                return incomplete()
+
+            cursor++
+            +CharOp(numberInfo.value)
+        } else {
+            val numberInfo = parseNumber(4, 4, base = 16) ?: return incomplete()
+            if (done)
+                return incomplete()
+
+            numberInfo.consume()
+            +CharOp(numberInfo.value)
+        }
     }
 
     private fun parseSecondary() {
@@ -363,46 +381,55 @@ class Parser(private val codePoints: IntArray, private val unicode: Boolean) {
 
                 state.alternationMark = state.mark()
             }
-            0x7b /* { */ -> {
-                cursor++
-
-                /*
-                 * RangeCheck [A, B]
-                 * JumpIfBelowRange +3
-                 * JumpIfAboveRange X+2
-                 * Fork/ForkNow X+1
-                 * <X opcodes>
-                 * Jump -X-5
-                 */
-
-                val modifierMark = state.modifierMark
-                val numTargetOpcodes = state.size - modifierMark.offset
-
-                val firstBound = parseNumber(1, 8, base = 10)?.value ?: error("Expected number")
-
-                if (done)
-                    error("Expected ',' or '}'")
-
-                val secondBound = if (consumeIf(0x2c /* , */)) {
-                    parseNumber(1, 8, base = 10)?.value
-                } else firstBound
-
-                if (!consumeIf(0x7d /* } */))
-                    error("Expected '}'")
-
-                val lazy = consumeIf(0x3f /* ? */)
-
-                modifierMark.insertBefore(RangeCheck(firstBound, secondBound))
-                modifierMark.insertBefore(JumpIfBelowRange(3))
-                modifierMark.insertBefore(JumpIfAboveRange(numTargetOpcodes + 2))
-
-                val forkOp = if (lazy) ::ForkNow else ::Fork
-                modifierMark.insertBefore(forkOp(numTargetOpcodes + 1))
-
-                +Jump(-numTargetOpcodes - 5)
-            }
-            else -> return
+            0x7b /* { */ -> parseBracketedRepetition()
+            else -> {}
         }
+    }
+
+    private fun parseBracketedRepetition() {
+        /*
+         * RangeCheck [A, B]
+         * JumpIfBelowRange +3
+         * JumpIfAboveRange X+2
+         * Fork/ForkNow X+1
+         * <X opcodes>
+         * Jump -X-5
+         */
+
+        expect(codePoint == 0x7b /* { */)
+        cursor++
+        val start = cursor
+
+        fun incomplete() {
+            cursor = start
+            +CharOp(0x7b)
+        }
+
+        val modifierMark = state.modifierMark
+        val numTargetOpcodes = state.size - modifierMark.offset
+
+        val firstBound = parseNumber(1, 8, base = 10)?.value ?: return incomplete()
+
+        if (done)
+            return incomplete()
+
+        val secondBound = if (consumeIf(0x2c /* , */)) {
+            parseNumber(1, 8, base = 10)?.value
+        } else firstBound
+
+        if (!consumeIf(0x7d /* } */))
+            return incomplete()
+
+        val lazy = consumeIf(0x3f /* ? */)
+
+        modifierMark.insertBefore(RangeCheck(firstBound, secondBound))
+        modifierMark.insertBefore(JumpIfBelowRange(3))
+        modifierMark.insertBefore(JumpIfAboveRange(numTargetOpcodes + 2))
+
+        val forkOp = if (lazy) ::ForkNow else ::Fork
+        modifierMark.insertBefore(forkOp(numTargetOpcodes + 1))
+
+        +Jump(-numTargetOpcodes - 5)
     }
 
     private fun codePointToInt(cp: Int, base: Int): Int? {
@@ -425,7 +452,7 @@ class Parser(private val codePoints: IntArray, private val unicode: Boolean) {
     }
 
     private fun parseNumber(min: Int, max: Int, base: Int): NumberInfo? {
-        expect(min >= 0 && max <= 8)
+        expect(min >= 0)
         expect(base <= 16)
 
         var value = 0
