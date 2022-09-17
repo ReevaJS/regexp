@@ -88,7 +88,7 @@ class Matcher(
                 ExecResult.Continue
             }
             is CharOp -> {
-                if (checkCondition(!state.done && state.codePoint == op.codePoint)) {
+                if (!state.done && checkCondition(state.codePoint == op.codePoint)) {
                     state.advanceSource()
                     state.advanceOp()
                     ExecResult.Continue
@@ -124,7 +124,7 @@ class Matcher(
                 return ExecResult.Continue
             }
             is CharRangeOp -> {
-                if (checkCondition(!state.done && state.codePoint in op.start..op.end)) {
+                if (!state.done && checkCondition(state.codePoint in op.start..op.end)) {
                     state.advanceSource()
                     state.advanceOp()
                     ExecResult.Continue
@@ -138,7 +138,7 @@ class Matcher(
                 }
             }
             WordOp -> {
-                if (checkCondition(!state.done && isWordCodepoint(state.codePoint))) {
+                if (!state.done && checkCondition(isWordCodepoint(state.codePoint))) {
                     state.advanceSource()
                     state.advanceOp()
                     ExecResult.Continue
@@ -157,14 +157,14 @@ class Matcher(
                 } else ExecResult.Fail
             }
             DigitOp -> {
-                if (checkCondition(!state.done && state.codePoint in 0x30..0x39 /* 0-9 */)) {
+                if (!state.done && checkCondition(state.codePoint in 0x30..0x39 /* 0-9 */)) {
                     state.advanceSource()
                     state.advanceOp()
                     ExecResult.Continue
                 } else ExecResult.Fail
             }
             WhitespaceOp -> {
-                if (checkCondition(!state.done && isWhitespaceCodepoint(state.codePoint))) {
+                if (!state.done && checkCondition(isWhitespaceCodepoint(state.codePoint))) {
                     state.advanceSource()
                     state.advanceOp()
                     ExecResult.Continue
@@ -175,7 +175,7 @@ class Matcher(
                     UnicodeSet("[\\p{${op.class_}}]").freeze()
                 }
 
-                if (checkCondition(!state.done && state.codePoint in set)) {
+                if (!state.done && checkCondition(state.codePoint in set)) {
                     state.advanceSource()
                     state.advanceOp()
                     ExecResult.Continue
