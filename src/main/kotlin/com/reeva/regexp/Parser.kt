@@ -24,6 +24,7 @@ class Parser(private val codePoints: IntArray, private val unicode: Boolean) {
 
         // The entire match is implicitly group 0
         +StartGroupOp(nextGroupIndex++, name = null)
+        state.alternationMark = state.mark()
 
         while (!done)
             parseSingle()
