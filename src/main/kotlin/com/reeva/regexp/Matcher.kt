@@ -19,7 +19,7 @@ class Matcher(
         while (index < source.size) {
             val result = match(index++) ?: continue
             yield(result)
-            index = result.groups[0].range.last + 1
+            index = result.indexedGroups[0].range.last + 1
         }
     }
 
@@ -64,22 +64,20 @@ class Matcher(
         println("State: $state, op: $op")
         return when (op) {
             is StartGroupOp -> {
-                state.groups.add(GroupState(op.index, state.sourceCursor))
-                state.advanceOp()
-                ExecResult.Continue
-            }
-            is StartNamedGroupOp -> {
-                state.groups.add(GroupState(op.name, state.sourceCursor))
+                state.groups.add(GroupState(op.index, op.name, state.sourceCursor))
                 state.advanceOp()
                 ExecResult.Continue
             }
             is EndGroupOp -> {
                 val groupState = state.groups.removeLast()
-                if (groupState.key != null) {
-                    state.groupContents[groupState.key] = MatchGroup(
+                if (groupState.index != null) {
+                    val group = MatchGroup(
                         groupState.content.toIntArray(),
                         groupState.rangeStart until state.sourceCursor,
                     )
+                    state.groupContents[groupState.index] = group
+                    if (groupState.name != null)
+                        state.groupContents[groupState.name] = group
                 }
                 state.advanceOp()
                 ExecResult.Continue
@@ -330,11 +328,12 @@ class Matcher(
     }
 
     private data class GroupState(
-        val key: Any? /* Int | String | null (non-capturing) */,
+        val index: Int?,
+        val name: String?,
         var rangeStart: Int,
         var content: MutableList<Int> = mutableListOf(),
     ) {
-        fun copy() = GroupState(key, rangeStart, content.toMutableList())
+        fun copy() = GroupState(index, name, rangeStart, content.toMutableList())
     }
 
     private val MatchState.done: Boolean
@@ -359,7 +358,7 @@ class Matcher(
         var sourceCursor: Int,
         var opcodeCursor: Int,
         val groups: MutableList<GroupState> = mutableListOf(),
-        val groupContents: MutableMap<Any /* Int | String */, MatchGroup> = mutableMapOf(),
+        val groupContents: MutableMap<Any, MatchGroup> = mutableMapOf(),
     ) {
         fun advanceOp() {
             opcodeCursor++

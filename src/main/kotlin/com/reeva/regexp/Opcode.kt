@@ -23,13 +23,14 @@ class CharRangeOp(val start: Int, val end: Int) : Opcode()  {
     override fun toString() = "CharRange($start-$end)"
 }
 
-// Null indicates non-capturing group
-class StartGroupOp(val index: Int?) : Opcode() {
-    override fun toString() = "StartGroup($index)"
-}
+// Null index indicates non-capturing group. Index cannot be null if name is not null
+class StartGroupOp(val index: Int?, val name: String?) : Opcode() {
+    init {
+        if (name != null)
+            expect(index != null)
+    }
 
-class StartNamedGroupOp(val name: String) : Opcode() {
-    override fun toString() = "StartNamedGroup($name)"
+    override fun toString() = "StartGroup($index, $name)"
 }
 
 object EndGroupOp : Opcode() {

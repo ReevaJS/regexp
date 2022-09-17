@@ -24,7 +24,7 @@ class Parser(private val codePoints: IntArray, private val unicode: Boolean) {
         states.add(State())
 
         // The entire match is implicitly group 0
-        +StartGroupOp(nextGroupIndex++)
+        +StartGroupOp(nextGroupIndex++, name = null)
 
         while (!done)
             parseSingle()
@@ -82,7 +82,7 @@ class Parser(private val codePoints: IntArray, private val unicode: Boolean) {
                 var lookOp: ((Array<Opcode>) -> LookOp)? = null
 
                 when {
-                    consumeIf(0x3f, 0x3a /* ?: */) -> +StartGroupOp(null)
+                    consumeIf(0x3f, 0x3a /* ?: */) -> +StartGroupOp(index = null, name = null)
                     consumeIf(0x3f, 0x3d /* ?= */) -> lookOp = ::PositiveLookaheadOp
                     consumeIf(0x3f, 0x21 /* ?! */) -> lookOp = ::NegativeLookaheadOp
                     consumeIf(0x3f, 0x3c, 0x3d /* ?<= */) -> lookOp = ::PositiveLookbehindOp
@@ -92,9 +92,9 @@ class Parser(private val codePoints: IntArray, private val unicode: Boolean) {
                         if (!groupNames.add(name))
                             error("Duplicate capturing group name \"$name\"")
 
-                        +StartNamedGroupOp(name)
+                        +StartGroupOp(nextGroupIndex++, name)
                     }
-                    else -> +StartGroupOp(nextGroupIndex++)
+                    else -> +StartGroupOp(nextGroupIndex++, name = null)
                 }
 
                 while (!done && codePoint != 0x29 /* ) */)

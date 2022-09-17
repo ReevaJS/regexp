@@ -12,30 +12,30 @@ data class MatchGroup(
 }
 
 data class MatchResult(
-    val groups: List<MatchGroup>,
+    val indexedGroups: List<MatchGroup>,
     val namedGroups: Map<String, MatchGroup>,
 ) {
     val groupValues: List<String>
-        get() = groups.map { it.value }
+        get() = indexedGroups.map { it.value }
 
     val range: IntRange
-        get() = groups.first().range.first..groups.last().range.last
+        get() = indexedGroups.first().range.first..indexedGroups.last().range.last
 
     override fun toString() = buildString {
         append("MatchResult(")
-        if (groups.isEmpty() && namedGroups.isEmpty()) {
+        if (indexedGroups.isEmpty() && namedGroups.isEmpty()) {
             append("<empty>)")
             return@buildString
         }
 
-        for ((index, group) in groups.withIndex()) {
+        for ((index, group) in indexedGroups.withIndex()) {
             appendGroup(index, group)
 
-            if (index != groups.lastIndex)
+            if (index != indexedGroups.lastIndex)
                 append(", ")
         }
 
-        if (groups.isNotEmpty() && namedGroups.isNotEmpty())
+        if (indexedGroups.isNotEmpty() && namedGroups.isNotEmpty())
             append(", ")
 
         for ((index, group) in namedGroups.entries.withIndex()) {
