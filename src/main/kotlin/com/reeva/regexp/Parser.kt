@@ -308,8 +308,6 @@ class Parser(private val codePoints: IntArray, private val unicode: Boolean) {
 
                 val op = if (lazy) ::ForkNow else ::Fork
                 modifierMark.insertBefore(op(numTargetOpcodes + 1))
-
-                state.modifierMark = state.mark()
             }
             0x2a /* * */ -> {
                 cursor++
@@ -329,8 +327,6 @@ class Parser(private val codePoints: IntArray, private val unicode: Boolean) {
 
                 modifierMark.insertBefore(firstOp(numTargetOpcodes + 2)) // Skip 'secondOp'
                 +secondOp(-numTargetOpcodes)
-
-                state.modifierMark = state.mark()
             }
             0x2b /* + */ -> {
                 cursor++
@@ -344,8 +340,6 @@ class Parser(private val codePoints: IntArray, private val unicode: Boolean) {
                 val numTargetOpcodes = state.size - state.modifierMark.offset
                 val op = if (lazy) ::Fork else ::ForkNow
                 +op(-numTargetOpcodes)
-
-                state.modifierMark = state.mark()
             }
             0x7c /* | */ -> {
                 cursor++
@@ -362,6 +356,7 @@ class Parser(private val codePoints: IntArray, private val unicode: Boolean) {
 
                 alternationMark.insertBefore(Fork(numTargetOpcodes + 2)) // Skip the jump
                 +Jump(numTargetOpcodes)
+
                 state.alternationMark = state.mark()
             }
             0x7b /* { */ -> {

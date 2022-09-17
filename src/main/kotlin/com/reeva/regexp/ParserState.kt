@@ -2,14 +2,14 @@ package com.reeva.regexp
 
 internal class ParserState {
     private val opcodes = mutableListOf<Opcode>()
-    private val marks = mutableMapOf<Int, Mark>()
+    private val marks = mutableListOf<Mark>()
     var alternationMark: ParserState.Mark = mark()
     var modifierMark: ParserState.Mark = mark()
 
     val size: Int
         get() = opcodes.size
 
-    fun mark(offset: Int = opcodes.size) = marks.getOrPut(offset) { Mark(offset) }
+    fun mark(offset: Int = opcodes.size) = Mark(offset)
 
     fun build() = opcodes.toTypedArray()
 
@@ -38,12 +38,9 @@ internal class ParserState {
                 op.offset--
         }
 
-        marks.toMap().forEach { (offset, mark) ->
-            if (offset >= index) {
-                marks.remove(offset)
+        marks.forEach { mark ->
+            if (mark.offset >= index)
                 mark.offset++
-                marks[mark.offset] = mark
-            }
         }
 
         // Add new opcode/mark
@@ -51,11 +48,10 @@ internal class ParserState {
     }
 
     fun merge(other: ParserState) {
-        other.marks.values.forEach {
+        other.marks.forEach {
             val newOffset = it.offset + opcodes.size
-            expect(newOffset !in marks)
-            marks[newOffset] = it
             it.offset = newOffset
+            marks.add(it)
         }
         this.opcodes.addAll(other.opcodes)
     }
