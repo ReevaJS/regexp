@@ -1,5 +1,9 @@
 package com.reeva.regexp
 
+import java.util.SortedMap
+import kotlin.math.max
+import kotlin.math.min
+
 data class MatchGroup(
     val codePoints: IntArray,
     val range: IntRange,
@@ -9,17 +13,36 @@ data class MatchGroup(
     fun copy() = MatchGroup(codePoints.copyOf(), range)
 
     override fun toString() = "MatchGroup(\"$value\", range=$range)"
+
+    override fun equals(other: Any?): Boolean {
+        if (this === other)
+            return true
+
+        return other is MatchGroup && codePoints.contentEquals(other.codePoints) && range == other.range
+    }
+
+    override fun hashCode(): Int {
+        var result = codePoints.contentHashCode()
+        result = 31 * result + range.hashCode()
+        return result
+    }
 }
 
 data class MatchResult(
-    val indexedGroups: List<MatchGroup>,
+    val indexedGroups: SortedMap<Int, MatchGroup>,
     val namedGroups: Map<String, MatchGroup>,
 ) {
-    val groupValues: List<String>
-        get() = indexedGroups.map { it.value }
+    val range: IntRange by lazy {
+        var start: Int? = null
+        var end: Int? = null
 
-    val range: IntRange
-        get() = indexedGroups.first().range.first..indexedGroups.last().range.last
+        indexedGroups.values.forEach { group ->
+            start = min(group.range.first, start ?: Int.MAX_VALUE)
+            end = max(group.range.last, start ?: Int.MIN_VALUE)
+        }
+
+        start!!..end!!
+    }
 
     override fun toString() = buildString {
         append("MatchResult(")
@@ -28,21 +51,25 @@ data class MatchResult(
             return@buildString
         }
 
-        for ((index, group) in indexedGroups.withIndex()) {
-            appendGroup(index, group)
-
-            if (index != indexedGroups.lastIndex)
+        var first = true
+        for ((index, group) in indexedGroups) {
+            if (!first)
                 append(", ")
+            first = false
+
+            appendGroup(index, group)
         }
 
         if (indexedGroups.isNotEmpty() && namedGroups.isNotEmpty())
             append(", ")
 
-        for ((index, group) in namedGroups.entries.withIndex()) {
-            appendGroup(group.key, group.value)
-
-            if (index != namedGroups.size - 1)
+        first = true
+        for (group in namedGroups) {
+            if (!first)
                 append(", ")
+            first = false
+
+            appendGroup(group.key, group.value)
         }
 
         append(")")

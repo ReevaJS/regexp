@@ -1,6 +1,7 @@
 package com.reeva.regexp
 
 import com.ibm.icu.text.UnicodeSet
+import java.util.TreeMap
 import kotlin.math.max
 
 @Suppress("MemberVisibilityCanBePrivate")
@@ -43,11 +44,11 @@ class Matcher(
         while (true) {
             when (execOp(state)) {
                 ExecResult.Match -> {
-                    val indexedGroups = state.groupContents.toList()
-                        .filter { it.first is Int }                        
-                        .sortedBy { it.first as Int }
-                        .map { it.second }
-                    
+                    @Suppress("UNCHECKED_CAST")
+                    val indexedGroups = (state.groupContents
+                        .filter { it.key is Int } as Map<Int, MatchGroup>)
+                        .let(::TreeMap)
+
                     @Suppress("UNCHECKED_CAST")
                     val namedGroups = state.groupContents.toList()
                         .filter { it.first is String }
