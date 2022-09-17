@@ -10,14 +10,6 @@ class CharOp(val codePoint: Int) : Opcode() {
     } else "Char($codePoint)"
 }
 
-class CharClassOp(val numEntries: Int) : Opcode() {
-    override fun toString() = "CharClass($numEntries)"
-}
-
-class InvertedCharClassOp(val numEntries: Int) : Opcode() {
-    override fun toString() = "InvertedCharClass($numEntries)"
-}
-
 // Used for character classes
 class CharRangeOp(val start: Int, val end: Int) : Opcode()  {
     override fun toString() = "CharRange($start-$end)"
@@ -80,6 +72,14 @@ object AnyOp : Opcode() {
 // Completes the RegExp match
 object MatchOp : Opcode() {
     override fun toString() = "Match"
+}
+
+class CharClassOp(val numEntries: Int, offset: Int) : OffsetOpcode(offset) {
+    override fun toString() = "CharClass($numEntries)"
+}
+
+class InvertedCharClassOp(val numEntries: Int, offset: Int) : OffsetOpcode(offset) {
+    override fun toString() = "InvertedCharClass($numEntries)"
 }
 
 ////////////////////

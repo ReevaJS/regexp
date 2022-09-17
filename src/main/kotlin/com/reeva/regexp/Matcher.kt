@@ -100,7 +100,7 @@ class Matcher(
 
                 for (i in 0 until op.numEntries) {
                     if (execOp(state, opcodes[state.opcodeCursor + i]) == ExecResult.Continue) {
-                        state.opcodeCursor = start + op.numEntries
+                        state.opcodeCursor = start + op.offset
                         return ExecResult.Continue
                     }
                 }

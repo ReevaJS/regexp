@@ -125,10 +125,12 @@ class Parser(private val codePoints: IntArray, private val unicode: Boolean) {
                 } else ::CharClassOp
 
                 states.add(ParserState())
+                var numTests = 0
 
                 while (!done && codePoint != 0x5d /* ] */) {
                     if (codePoint == 0x5c /* \ */) {
                         parseEscape(inCharClass = true)
+                        numTests++
                         continue
                     }
 
@@ -146,13 +148,15 @@ class Parser(private val codePoints: IntArray, private val unicode: Boolean) {
                     } else {
                         +CharOp(start)
                     }
+
+                    numTests++
                 }
 
                 if (!consumeIf(0x5d /* ] */))
                     error("Expected closing ']'")
 
                 val classState = states.removeLast()
-                +charClassOp(classState.size)
+                +charClassOp(numTests, classState.size)
                 state.merge(classState)
             }
             0x5c /* \ */ -> parseEscape(inCharClass = false)
