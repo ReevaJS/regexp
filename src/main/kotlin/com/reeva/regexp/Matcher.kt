@@ -2,6 +2,7 @@ package com.reeva.regexp
 
 import com.ibm.icu.text.UnicodeSet
 
+@Suppress("MemberVisibilityCanBePrivate")
 class Matcher(
     private val source: IntArray, 
     private val opcodes: Array<Opcode>,
@@ -12,30 +13,23 @@ class Matcher(
     private val rangeCounts = mutableMapOf<Int, Int>()
     private var rangeResult: RangeResult? = null
 
-    fun match(startIndex: Int = 0): List<MatchResult>? {
-        pendingStates.clear()
+    fun matchSequence(startIndex: Int = 0): Sequence<MatchResult> = sequence {
+        var index = startIndex
 
-        // Common-case optimization: Don't check the entire string if regex starts with
-        // a StartOp (it will be the second op, since the first is always StartGroupOp(0))
-
-        if (opcodes[1] == StartOp)
-            return if (startIndex != 0) null else exec(MatchState(0, 0))?.let(::listOf)
-
-        var sourceIndex = startIndex
-        val results = mutableListOf<MatchResult>()
-
-        while (sourceIndex < source.size) {
-            val result = exec(MatchState(sourceIndex, 0))
-            if (result != null) {
-                results.add(result)
-                sourceIndex = result.groups[0].range.last + 1
-                pendingStates.clear()
-            } else {
-                sourceIndex++
-            }
+        while (index < source.size) {
+            val result = match(index++) ?: continue
+            yield(result)
+            index = result.groups[0].range.last + 1
         }
+    }
 
-        return if (results.isEmpty()) null else results
+    fun matchAll(startIndex: Int = 0): List<MatchResult>? {
+        return matchSequence(startIndex).toList().takeIf { it.isNotEmpty() }
+    }
+
+    fun match(startIndex: Int = 0): MatchResult? {
+        pendingStates.clear()
+        return exec(MatchState(startIndex, 0))
     }
 
     private fun exec(initialState: MatchState): MatchResult? {

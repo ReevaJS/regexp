@@ -18,6 +18,9 @@ data class MatchResult(
     val groupValues: List<String>
         get() = groups.map { it.value }
 
+    val range: IntRange
+        get() = groups.first().range.first..groups.last().range.last
+
     override fun toString() = buildString {
         append("MatchResult(")
         if (groups.isEmpty() && namedGroups.isEmpty()) {

@@ -1,30 +1,33 @@
+
 package com.reeva.regexp
 
+@Suppress("unused", "MemberVisibilityCanBePrivate")
 class RegExp(
     private val regexCodePoints: IntArray, 
     private val flags: Set<Flag>,
 ) {
     constructor(regex: String, vararg flags: Flag) : this(regex.codePoints().toArray(), flags.toSet()) 
 
-    fun test(text: String) = match(text) != null
+    fun test(codePoints: IntArray) = match(codePoints) != null
 
-    fun match(text: String) = matcher(text).match()
+    fun test(text: String) = test(text.codePoints().toArray())
 
-    fun matcher(text: String): Matcher {
+    fun match(codePoints: IntArray) = matcher(codePoints).matchAll()
+
+    fun match(text: String) = match(text.codePoints().toArray())
+
+    fun matcher(codePoints: IntArray): Matcher {
         val opcodes = Parser(regexCodePoints, unicode = Flag.Unicode in flags).parse()
-
-        for (op in opcodes)
-            println(op)
-        println()
-
-        return Matcher(text.codePoints().toArray(), opcodes, flags)
+        return Matcher(codePoints, opcodes, flags)
     }
+
+    fun matcher(text: String) = matcher(text.codePoints().toArray())
 
     enum class Flag {
         MultiLine,
         Insensitive,
         Unicode,
-        SingleLine,
+        DotMatchesNewlines,
     }
 }
 
