@@ -2,11 +2,11 @@ package com.reevajs.regexp
 
 sealed class ASTNode
 
-class RootNode(val groupNames: Map<Short, String>, val nodes: List<ASTNode>) : ASTNode()
+data class RootNode(val groupNames: Map<Short, String>, val nodes: List<ASTNode>) : ASTNode()
 
-class GroupNode(val index: Short?, val nodes: List<ASTNode>) : ASTNode()
+data class GroupNode(val index: Short?, val nodes: List<ASTNode>) : ASTNode()
 
-class CodePointNode(val codePoint: Int) : ASTNode()
+data class CodePointNode(val codePoint: Int) : ASTNode()
 
 data class NegateNode(val node: ASTNode) : ASTNode()
 
@@ -26,17 +26,17 @@ object WhitespaceNode : ASTNode()
 
 object MatchNode : ASTNode()
 
-class UnicodeClassNode(val name: String) : ASTNode()
+data class UnicodeClassNode(val name: String) : ASTNode()
 
 // Note: When emitted by the parser, this may not refer to a valid index. If
 //       so, the compiler will treat this as if it were a CodepointNode
-class BackReferenceNode(var index: Short) : ASTNode()
+data class BackReferenceNode(var index: Short) : ASTNode()
 
-class CharacterClassNode(val nodes: List<ASTNode>) : ASTNode()
+data class CharacterClassNode(val nodes: List<ASTNode>) : ASTNode()
 
-class InvertedCharacterClassNode(val nodes: List<ASTNode>) : ASTNode()
+data class InvertedCharacterClassNode(val nodes: List<ASTNode>) : ASTNode()
 
-class CodePointRangeNode(val start: Int, val end: Int) : ASTNode()
+data class CodePointRangeNode(val start: Int, val end: Int) : ASTNode()
 
 interface QuantifierNode
 
