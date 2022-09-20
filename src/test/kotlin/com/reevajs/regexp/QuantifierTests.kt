@@ -15,7 +15,7 @@ class QuantifierTests : TestBase() {
 
         for (target in targets) {
             for (quantifier in quantifiers)
-                testSyntaxError(target + quantifier)
+                testDoesNotCompile(target + quantifier)
         }
     }
 }

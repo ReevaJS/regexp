@@ -40,12 +40,27 @@ abstract class TestBase {
         }
     }
 
-    protected fun testSyntaxError(@Language("regexp") regexp: String, vararg flags: RegExp.Flag) {
+    protected fun testDoesNotCompile(@Language("regexp") regexp: String, vararg flags: RegExp.Flag) {
         expectThrows<RegexSyntaxError> { RegExp(regexp, *flags) }
     }
 
-    protected fun testNoSyntaxError(@Language("regexp") regexp: String, vararg flags: RegExp.Flag) {
+    protected fun testCompiles(@Language("regexp") regexp: String, vararg flags: RegExp.Flag) {
         expectCatching { RegExp(regexp, *flags) }.isSuccess()
+    }
+
+    protected fun testMatchesEntire(@Language("regexp") regexp: String, value: String, vararg flags: RegExp.Flag) {
+        val matches = RegExp(regexp, *flags).match(value)
+        expect(matches != null && matches.isNotEmpty()) {
+            "/$regexp/ does not match string \"$value\" (${value.codePoints().toArray().joinToString(" ")})"
+        }
+
+        val match = matches[0]
+
+        expect(match.groups.isNotEmpty()) {
+            "Match has no groups"
+        }
+
+        expectThat(match.range).isEqualTo(0 until value.codePointCount(0, value.length))
     }
 
     class MatchesBuilder {

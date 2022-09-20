@@ -31,12 +31,12 @@ class CharacterClassTests : TestBase() {
     }
 
     @Test
-    fun `test out of order range`() = testSyntaxError("[b-a]")
+    fun `test out of order range`() = testDoesNotCompile("[b-a]")
 
     @Test
     fun `test meta escapes in class ranges are a syntax error`() = listOf(
         "\\s", "\\S", "\\d", "\\D", "\\w", "\\W"
     ).forEach {
-        testSyntaxError("[a-$it]")
+        testDoesNotCompile("[a-$it]")
     }
 }
