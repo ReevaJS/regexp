@@ -198,6 +198,7 @@ class Parser(private val codePoints: IntArray, private val unicode: Boolean) {
                 +AlternationNode(lhs, rhs)
             }
             '{'.code -> {
+                cursor++
                 val start = codePoint
 
                 fun incomplete() {
@@ -223,7 +224,7 @@ class Parser(private val codePoints: IntArray, private val unicode: Boolean) {
                 if (!consumeIf('}'.code))
                     return incomplete()
 
-                if (secondBound != null && secondBound > firstBound)
+                if (secondBound != null && firstBound > secondBound)
                     error("Quantifier range is out of order")
 
                 val node = popNode()
@@ -234,8 +235,11 @@ class Parser(private val codePoints: IntArray, private val unicode: Boolean) {
                 if (secondBound != null)
                     expect(secondBound < Short.MAX_VALUE)
 
-                if (firstBound != 0 || secondBound != 0)
-                    +RepetitionNode(node, firstBound.toShort(), secondBound?.toShort(), consumeIf('?'.code))
+                when {
+                    firstBound == 0 && secondBound == 0 -> {}
+                    firstBound == secondBound -> +node
+                    else -> +RepetitionNode(node, firstBound.toShort(), secondBound?.toShort(), consumeIf('?'.code))
+                }
             }
         }
     }
