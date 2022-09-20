@@ -38,6 +38,19 @@ class RegExp(
 
     fun matcher(text: String) = matcher(text.codePoints().toArray())
 
+    override fun toString() = buildString {
+        append("RegExp(")
+        regexCodePoints.forEach(::appendCodePoint)
+
+        for ((index, flag) in flags.withIndex()) {
+            append(flag.name)
+            if (index != flags.size - 1)
+                append(" | ")
+        }
+
+        append(")")
+    }
+
     enum class Flag {
         MultiLine,
         Insensitive,
