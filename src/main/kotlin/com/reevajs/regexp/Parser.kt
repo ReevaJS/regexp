@@ -261,20 +261,56 @@ class Parser(private val codePoints: IntArray, private val unicode: Boolean) {
             error("RegExp cannot end with a backslash")
 
         when (codePoint) {
-            't'.code -> +CodePointNode('\t'.code)
-            'n'.code -> +CodePointNode('\n'.code)
-            'v'.code -> +CodePointNode(0xb)
-            'r'.code -> +CodePointNode('\r'.code)
-            's'.code -> +WhitespaceNode
-            'S'.code -> +NegateNode(WhitespaceNode)
-            'b'.code -> if (inCharClass) {
-                +CodePointNode(0x8)
-            } else +WordBoundaryNode
-            'B'.code -> +NegateNode(WordBoundaryNode)
-            'd'.code -> +DigitNode
-            'D'.code -> +NegateNode(DigitNode)
-            'w'.code -> +WordNode
-            'W'.code -> +NegateNode(WordNode)
+            't'.code -> {
+                cursor++
+                +CodePointNode('\t'.code)
+            }
+            'n'.code -> {
+                cursor++
+                +CodePointNode('\n'.code)
+            }
+            'v'.code -> {
+                cursor++
+                +CodePointNode(0xb)
+            }
+            'r'.code -> {
+                cursor++
+                +CodePointNode('\r'.code)
+            }
+            's'.code -> {
+                cursor++
+                +WhitespaceNode
+            }
+            'S'.code -> {
+                cursor++
+                +NegateNode(WhitespaceNode)
+            }
+            'b'.code -> {
+                cursor++
+                if (inCharClass) {
+                    +CodePointNode(0x8)
+                } else +WordBoundaryNode
+            }
+            'B'.code -> {
+                cursor++
+                +NegateNode(WordBoundaryNode)
+            }
+            'd'.code -> {
+                cursor++
+                +DigitNode
+            }
+            'D'.code -> {
+                cursor++
+                +NegateNode(DigitNode)
+            }
+            'w'.code -> {
+                cursor++
+                +WordNode
+            }
+            'W'.code -> {
+                cursor++
+                +NegateNode(WordNode)
+            }
             in '1'.code..'9'.code -> {
                 if (inCharClass) {
                     val number = parseNumber(1, 3, base = 8)
@@ -294,10 +330,7 @@ class Parser(private val codePoints: IntArray, private val unicode: Boolean) {
                     +BackReferenceNode(result.value.toShort())
                 }
             }
-            'u'.code -> {
-                parseUnicodeEscapeSequence()
-                return
-            }
+            'u'.code -> parseUnicodeEscapeSequence()
             'x'.code -> {
                 cursor++
                 val value = parseNumber(2, 2, base = 16)?.let {
@@ -305,7 +338,6 @@ class Parser(private val codePoints: IntArray, private val unicode: Boolean) {
                     it.value
                 } ?: 'x'.code
                 +CodePointNode(value)
-                return
             }
             'p'.code, 'P'.code -> {
                 val shouldNegate = codePoint == 'P'.code
@@ -322,8 +354,6 @@ class Parser(private val codePoints: IntArray, private val unicode: Boolean) {
                 +UnicodeClassNode(text).also {
                     if (shouldNegate) +NegateNode(it) else +it
                 }
-
-                return
             }
             'k'.code -> {
                 if (inCharClass)
@@ -340,13 +370,9 @@ class Parser(private val codePoints: IntArray, private val unicode: Boolean) {
                 } else {
                     +CodePointNode('k'.code)
                 }
-
-                return
             }
             else -> +CodePointNode(codePoint)
         }
-
-        cursor++
     }
 
     private fun parseUnicodeEscapeSequence() {
