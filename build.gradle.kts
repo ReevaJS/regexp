@@ -26,7 +26,7 @@ dependencies {
 }
 
 application {
-    mainClass.set("com.reeva.regexp.AppKt")
+    mainClass.set("com.reevajs.regexp.AppKt")
 }
 
 tasks {
