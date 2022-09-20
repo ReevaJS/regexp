@@ -1,140 +1,169 @@
 package com.reevajs.regexp
 
-sealed class Opcode
+class Opcodes(
+    val bytes: ByteArray,
+    val groupNames: Map<Short, String>,
+)
 
-// Everything is stored as an int, since storing it as a Char does _actually_
-// save any space (all integer types except Long are reduced to Int on the JVM)
-class CharOp(val codePoint: Int) : Opcode() {
-    override fun toString() = if (codePoint < Char.MAX_VALUE.code) {
-        "Char(${codePoint.toChar()})"
-    } else "Char($codePoint)"
-}
+/**
+ * START_GROUP_OP
+ * index: SHORT
+ */
+const val START_GROUP_OP: Byte = 1
 
-// Used for character classes
-class CharRangeOp(val start: Int, val end: Int) : Opcode()  {
-    override fun toString() = "CharRange($start-$end)"
-}
+const val START_NON_CAPTURING_GROUP_OP: Byte = 2
+const val END_GROUP_OP: Byte = 3
 
-// Null index indicates non-capturing group. Index cannot be null if name is not null
-class StartGroupOp(val index: Int?, val name: String?) : Opcode() {
-    init {
-        if (name != null)
-            expect(index != null)
-    }
+/**
+ * CODEPOINT1_OP
+ * BYTE
+ */
+const val CODEPOINT1_OP: Byte = 4
 
-    override fun toString() = "StartGroup($index, $name)"
-}
+/**
+ * CODEPOINT2_OP
+ * SHORT
+ */
+const val CODEPOINT2_OP: Byte = 5
 
-object EndGroupOp : Opcode() {
-    override fun toString() = "EndGroup"
-}
+/**
+ * CODEPOINT3_OP
+ * INT
+ */
+const val CODEPOINT4_OP: Byte = 6
 
-object NegateNextOp : Opcode() {
-    override fun toString() = "NegateNext"
-}
+const val START_OP: Byte = 7
+const val END_OP: Byte = 8
+const val ANY_OP: Byte = 9
+const val NEGATE_NEXT_OP: Byte = 10
+const val WORD_OP: Byte = 11
+const val WORD_BOUNDARY_OP: Byte = 12
+const val DIGIT_OP: Byte = 13
+const val WHITESPACE_OP: Byte = 14
+const val MATCH_OP: Byte = 15
 
-object WordOp : Opcode() {
-    override fun toString() = "Word"
-}
+/**
+ * UNICODE_CLASS_OP
+ * length: BYTE
+ * class name: <length> BYTE (all ASCII, as all unicode class names are normal letters)
+ */
+const val UNICODE_CLASS_OP: Byte = 16
 
-object WordBoundaryOp : Opcode() {
-    override fun toString() = "WordBoundary"
-}
+/**
+ * BACK_REFERENCE_OP
+ * index: SHORT
+ */
+const val BACK_REFERENCE_OP: Byte = 17
 
-object DigitOp : Opcode() {
-    override fun toString() = "Digit"
-}
+/**
+ * CHAR_CLASS_OP
+ * num entries: SHORT
+ * offset: SHORT
+ */
+const val CHAR_CLASS_OP: Byte = 18
 
-object WhitespaceOp : Opcode() {
-    override fun toString() = "Whitespace"
-}
+/**
+ * INVERTED_CHAR_CLASS_OP
+ * num entries: SHORT
+ * num bytes: SHORT
+ */
+const val INVERTED_CHAR_CLASS_OP: Byte = 19
 
-data class UnicodeClassOp(val class_: String) : Opcode() {
-    override fun toString() = "UnicodeClass($class_)"
-}
+/**
+ * RANGE1_OP
+ * start: BYTE
+ * end: BYTE
+ */
+const val RANGE1_OP: Byte = 20
 
-data class BackReferenceOp(val key: Any /* String | Int */) : Opcode() {
-    override fun toString() = "BackReferenceOp(\\$key)"
-}
+/**
+ * RANGE2_OP
+ * start: SHORT
+ * end: SHORT
+ */
+const val RANGE2_OP: Byte = 21
 
-object StartOp : Opcode() {
-    override fun toString() = "Start"
-}
-
-object EndOp : Opcode() {
-    override fun toString() = "End"
-}
-
-object AnyOp : Opcode() {
-    override fun toString() = "Any"
-}
-
-// Completes the RegExp match
-object MatchOp : Opcode() {
-    override fun toString() = "Match"
-}
-
-class CharClassOp(val numEntries: Int, offset: Int) : OffsetOpcode(offset) {
-    override fun toString() = "CharClass($numEntries)"
-}
-
-class InvertedCharClassOp(val numEntries: Int, offset: Int) : OffsetOpcode(offset) {
-    override fun toString() = "InvertedCharClass($numEntries)"
-}
+/**
+ * RANGE4_OP
+ * start: INT
+ * end: INT
+ */
+const val RANGE4_OP: Byte = 22
 
 ////////////////////
 // VM-focused ops //
 ////////////////////
 
-// Opcodes which may need an offset adjusted if opcodes get inserted
-// arbitrarily into the opcode list
-sealed class OffsetOpcode(var offset: Int) : Opcode()
+// Note: All offset are relative to the byte corresponding to the opcode to which they belong. 
+// In other words, "JUMP 0" would be an infinite loop
 
-// Clone the current state and branch into a different opcode. Keep
-// executing the current state
-class Fork(offset: Int) : OffsetOpcode(offset) {
-    override fun toString() = "Fork($offset)"
-}
+/**
+ * Clone the current state and branch into a different opcode. Keep
+ * executing the current state
+ *
+ * FORK_OP
+ * offset: SHORT
+ */
+const val FORK_OP: Byte = 23
 
-// Clone the current state and branch into a different opcode. Start
-// executing the fork immediately
-class ForkNow(offset: Int) : OffsetOpcode(offset) {
-    override fun toString() = "ForkNow($offset)"
-}
+/**
+ * Clone the current state and branch into a different opcode. Start
+ * executing the fork immediately
+ *
+ * FORK_NOW_OP
+ * offset: SHORT
+ */
+const val FORK_NOW_OP: Byte = 24
 
-class Jump(offset: Int) : OffsetOpcode(offset) {
-    override fun toString() = "Jump($offset)"
-}
+/**
+ * JUMP_OP
+ * offset: SHORT
+ */
+const val JUMP_OP: Byte = 25
 
-class RangeCheck(val min: Int, val max: Int?) : Opcode() {
-    override fun toString() = "RangeCheck($min, $max)"
-}
+/**
+ * RANGE_CHECK_OP
+ * min: SHORT
+ * max: SHORT
+ */
+const val RANGE_CHECK_OP: Byte = 26
 
-class JumpIfBelowRange(offset: Int) : OffsetOpcode(offset) {
-    override fun toString() = "JumpIfBelowRange($offset)"
-}
+/**
+ * JUMP_IF_BELOW_RANGE_OP
+ * offset: SHORT
+ */
+const val JUMP_IF_BELOW_RANGE_OP: Byte = 27
 
-class JumpIfAboveRange(offset: Int) : OffsetOpcode(offset) {
-    override fun toString() = "JumpIfAboveRange($offset)"
-}
+/**
+ * JUMP_IF_ABOVE_RANGE_OP
+ * offset: SHORT
+ */
+const val JUMP_IF_ABOVE_RANGE_OP: Byte = 28
 
-sealed class LookOp(val opcodes: Array<Opcode>, val isPositive: Boolean, val isAhead: Boolean) : Opcode() {
-    override fun toString() = buildString {
-        append(this@LookOp::class.simpleName!!.replace("Op", ""))
-        append(" [\n")
-        opcodes.forEach { 
-            append("  ")
-            append(it)
-            append('\n')
-        }
-        append("]")
-    }
-}
+/**
+ * POSITIVE_LOOKAHEAD_OP
+ * num opcodes: SHORT
+ * <num opcodes>
+ */
+const val POSITIVE_LOOKAHEAD_OP: Byte = 29
 
-class PositiveLookaheadOp(opcodes: Array<Opcode>) : LookOp(opcodes, true, true)
+/**
+ * POSITIVE_LOOKBEHIND_OP
+ * num opcodes: SHORT
+ * <num opcodes>
+ */
+const val POSITIVE_LOOKBEHIND_OP: Byte = 30
 
-class NegativeLookaheadOp(opcodes: Array<Opcode>) : LookOp(opcodes, false, true)
+/**
+ * NEGATIVE_LOOKAHEAD_OP
+ * num opcodes: SHORT
+ * <num opcodes>
+ */
+const val NEGATIVE_LOOKAHEAD_OP: Byte = 31
 
-class PositiveLookbehindOp(opcodes: Array<Opcode>) : LookOp(opcodes, true, false)
-
-class NegativeLookbehindOp(opcodes: Array<Opcode>) : LookOp(opcodes, false, false)
+/**
+ * NEGATIVE_LOOKBEHIND_OP
+ * num opcodes: SHORT
+ * <num opcodes>
+ */
+const val NEGATIVE_LOOKBEHIND_OP: Byte = 32

@@ -1,15 +1,19 @@
 package com.reevajs.regexp
 
 import com.ibm.icu.text.UnicodeSet
-import java.util.TreeMap
+import java.nio.ByteBuffer
+import java.util.*
 import kotlin.math.max
 
 @Suppress("MemberVisibilityCanBePrivate")
 class Matcher(
-    private val source: IntArray, 
-    private val opcodes: Array<Opcode>,
+    private val source: IntArray,
+    opcodes: Opcodes,
     private val flags: Set<RegExp.Flag>,
 ) {
+    private val buffer = ByteBuffer.wrap(opcodes.bytes)
+    private val groupNames = opcodes.groupNames
+
     private val pendingStates = mutableListOf<MatchState>()
     private var negateNext = false
     private val rangeCounts = mutableMapOf<Int, Int>()
@@ -22,7 +26,7 @@ class Matcher(
             val result = match(index)
             if (result != null) {
                 yield(result)
-                index = max(index + 1, result.indexedGroups[0]!!.range.last + 1)
+                index = max(index + 1, result.groups[0]!!.range.last + 1)
             } else {
                 index++
             }
@@ -41,20 +45,25 @@ class Matcher(
     private fun exec(initialState: MatchState): MatchResult? {
         var state = initialState
 
+        // Set up the implicit group 0 state
+        state.groups.add(GroupState(0, state.sourceCursor))
+
         while (true) {
             when (execOp(state)) {
                 ExecResult.Match -> {
-                    @Suppress("UNCHECKED_CAST")
-                    val indexedGroups = (state.groupContents
-                        .filter { it.key is Int } as Map<Int, MatchGroup>)
-                        .let(::TreeMap)
+                    // Store the implicit group 0 state
+                    val group0 = state.groups.removeLast()
+                    expect(group0.index == 0.toShort())
+                    expect(state.groups.isEmpty())
+                    state.groupContents[0] = MatchGroup(
+                        group0.content.toIntArray(),
+                        group0.rangeStart until state.sourceCursor,
+                    )
 
-                    @Suppress("UNCHECKED_CAST")
-                    val namedGroups = state.groupContents.toList()
-                        .filter { it.first is String }
-                        .toMap() as Map<String, MatchGroup>
-
-                    return MatchResult(indexedGroups, namedGroups)
+                    return MatchResult(
+                        TreeMap(state.groupContents.mapKeys { (k, _) -> k.toInt() }),
+                        groupNames.mapKeys { (k, _) -> k.toInt() },
+                    )
                 }
                 ExecResult.Continue -> {}
                 ExecResult.Fail -> {
@@ -66,137 +75,129 @@ class Matcher(
         }
     }
 
-    private fun execOp(state: MatchState, op: Opcode = state.op): ExecResult {
+    private fun execOp(state: MatchState, position: Int = state.opcodeCursor): ExecResult = with(state) {
         if (state.sourceCursor > source.size)
             return ExecResult.Fail
 
-        return when (op) {
-            is StartGroupOp -> {
-                state.groups.add(GroupState(op.index, op.name, state.sourceCursor))
-                state.advanceOp()
+        buffer.position(position)
+
+        return when (val op = readByte()) {
+            START_GROUP_OP -> {
+                groups.add(GroupState(readShort(), sourceCursor))
                 ExecResult.Continue
             }
-            is EndGroupOp -> {
-                val groupState = state.groups.removeLast()
+            START_NON_CAPTURING_GROUP_OP -> {
+                groups.add(GroupState(null, sourceCursor))
+                ExecResult.Continue
+            }
+            END_GROUP_OP -> {
+                val groupState = groups.removeLast()
                 if (groupState.index != null) {
-                    val group = MatchGroup(
+                    groupContents[groupState.index] = MatchGroup(
                         groupState.content.toIntArray(),
-                        groupState.rangeStart until state.sourceCursor,
+                        groupState.rangeStart until sourceCursor,
                     )
-                    state.groupContents[groupState.index] = group
-                    if (groupState.name != null)
-                        state.groupContents[groupState.name] = group
                 }
-                state.advanceOp()
                 ExecResult.Continue
             }
-            is CharOp -> {
-                if (!state.done && checkCondition(state.codePoint == op.codePoint)) {
-                    state.advanceSource()
-                    state.advanceOp()
+            CODEPOINT1_OP -> {
+                val cp = readByte().toInt()
+                if (!done && checkCondition(codePoint == cp)) {
+                    advanceSource()
                     ExecResult.Continue
                 } else ExecResult.Fail
             }
-            is CharClassOp -> {
-                state.advanceOp()
-                val start = state.opcodeCursor
-
-                for (i in 0 until op.numEntries) {
-                    if (execOp(state, opcodes[state.opcodeCursor + i]) == ExecResult.Continue) {
-                        state.opcodeCursor = start + op.offset
-                        return ExecResult.Continue
-                    }
-                }
-
-                return ExecResult.Fail
-            }
-            is InvertedCharClassOp -> {
-                if (state.done)
-                    return ExecResult.Fail
-
-                state.advanceOp()
-
-                expect(!negateNext)
-
-                for (i in 0 until op.numEntries) {
-                    if (execOp(state.copy(), opcodes[state.opcodeCursor + i]) == ExecResult.Continue) {
-                        return ExecResult.Fail
-                    }
-                }
-
-                state.opcodeCursor += op.numEntries
-                state.advanceSource()
-
-                return ExecResult.Continue
-            }
-            is CharRangeOp -> {
-                if (!state.done && checkCondition(state.codePoint in op.start..op.end)) {
-                    state.advanceSource()
-                    state.advanceOp()
+            CODEPOINT2_OP -> {
+                val cp = readShort().toInt()
+                if (!done && checkCondition(codePoint == cp)) {
+                    advanceSource()
                     ExecResult.Continue
                 } else ExecResult.Fail
             }
-            NegateNextOp -> {
-                state.advanceOp()
+            CODEPOINT4_OP -> {
+                val cp = readInt()
+                if (!done && checkCondition(codePoint == cp)) {
+                    advanceSource()
+                    ExecResult.Continue
+                } else ExecResult.Fail
+            }
+            START_OP -> {
+                if (checkCondition(sourceCursor == 0)) {
+                    ExecResult.Continue
+                } else ExecResult.Fail
+            }
+            END_OP -> {
+                if (checkCondition(sourceCursor == source.size)) {
+                    ExecResult.Continue
+                } else ExecResult.Fail
+            }
+            ANY_OP -> {
+                if (checkCondition(sourceCursor < source.size)) {
+                    advanceSource()
+                    ExecResult.Continue
+                } else ExecResult.Fail
+            }
+            NEGATE_NEXT_OP -> {
                 negateNext = true
                 execOp(state).also {
                     negateNext = false
                 }
             }
-            WordOp -> {
-                if (!state.done && checkCondition(isWordCodepoint(state.codePoint))) {
-                    state.advanceSource()
-                    state.advanceOp()
+            WORD_OP -> {
+                if (!done && checkCondition(isWordCodepoint(codePoint))) {
+                    advanceSource()
                     ExecResult.Continue
                 } else ExecResult.Fail
             }
-            WordBoundaryOp -> {
-                val lastIsWord = if (state.sourceCursor != 0) {
-                    isWordCodepoint(source[state.sourceCursor - 1])
+            WORD_BOUNDARY_OP -> {
+                val lastIsWord = if (sourceCursor != 0) {
+                    isWordCodepoint(source[sourceCursor - 1])
                 } else false
 
-                val currentIsWord = !state.done && isWordCodepoint(state.codePoint)
+                val currentIsWord = !done && isWordCodepoint(codePoint)
 
                 if (checkCondition(lastIsWord != currentIsWord)) {
-                    state.advanceOp()
                     ExecResult.Continue
                 } else ExecResult.Fail
             }
-            DigitOp -> {
-                if (!state.done && checkCondition(state.codePoint in 0x30..0x39 /* 0-9 */)) {
-                    state.advanceSource()
-                    state.advanceOp()
+            DIGIT_OP -> {
+                if (!done && checkCondition(codePoint in '0'.code..'1'.code)) {
+                    advanceSource()
                     ExecResult.Continue
                 } else ExecResult.Fail
             }
-            WhitespaceOp -> {
-                if (!state.done && checkCondition(isWhitespaceCodepoint(state.codePoint))) {
-                    state.advanceSource()
-                    state.advanceOp()
+            WHITESPACE_OP -> {
+                if (!done && checkCondition(isWhitespaceCodepoint(codePoint))) {
+                    advanceSource()
                     ExecResult.Continue
                 } else ExecResult.Fail
             }
-            is UnicodeClassOp -> {
-                val set = unicodeSets.getOrPut(op.class_) {
-                    UnicodeSet("[\\p{${op.class_}}]").freeze()
+            MATCH_OP -> ExecResult.Match
+            UNICODE_CLASS_OP -> {
+                val length = readByte().toInt()
+                val clazz = buildString {
+                    repeat(length) {
+                        append(readByte().toInt().toChar())
+                    }
+                }
+                val set = unicodeSets.getOrPut(clazz) {
+                    UnicodeSet("[\\p{${clazz}}]").freeze()
                 }
 
-                if (!state.done && checkCondition(state.codePoint in set)) {
-                    state.advanceSource()
-                    state.advanceOp()
+                if (!done && checkCondition(codePoint in set)) {
+                    advanceSource()
                     ExecResult.Continue
                 } else ExecResult.Fail
             }
-            is BackReferenceOp -> {
+            BACK_REFERENCE_OP -> {
                 // Take the following regexp as an example: "\k<a>(?<a>x)"
                 // This regex will match "x", meaning that if this group doesn't exist, we should
                 // consume nothing and return Continue
-                val content = state.groupContents[op.key]?.codePoints ?: run {
-                    state.advanceOp()
+                val content = state.groupContents[readShort()]?.codePoints ?: run {
                     return if (checkCondition(true)) ExecResult.Continue else ExecResult.Fail
                 }
 
-                val startCursor = state.sourceCursor
+                val startCursor = sourceCursor
 
                 val matched = run {
                     if (startCursor + content.size > source.size)
@@ -211,83 +212,131 @@ class Matcher(
                 }
 
                 if (checkCondition(matched)) {
-                    state.advanceOp()
-                    state.advanceSource(content.size)
+                    advanceSource(content.size)
                     ExecResult.Continue
                 } else ExecResult.Fail
             }
-            StartOp -> {
-                if (checkCondition(state.sourceCursor == 0)) {
-                    state.advanceOp()
+            CHAR_CLASS_OP -> {
+                val numEntries = readShort()
+                val numBytes = readShort()
+
+                val start = opcodeCursor
+
+                for (i in 0 until numEntries) {
+                    if (execOp(state, opcodeCursor + i) == ExecResult.Continue) {
+                        opcodeCursor = start + numBytes.toInt()
+                        return ExecResult.Continue
+                    }
+                }
+
+                return ExecResult.Fail
+            }
+            INVERTED_CHAR_CLASS_OP -> {
+                if (done)
+                    return ExecResult.Fail
+
+                expect(!negateNext)
+
+                val numEntries = readShort()
+                val offset = readShort()
+
+                for (i in 0 until numEntries) {
+                    if (execOp(state.copy(), opcodeCursor + i) == ExecResult.Continue)
+                        return ExecResult.Fail
+                }
+
+                opcodeCursor += offset
+                advanceSource()
+
+                return ExecResult.Continue
+            }
+            RANGE1_OP -> {
+                val start = readByte().toInt()
+                val end = readByte().toInt()
+                if (!done && checkCondition(codePoint in start..end)) {
+                    advanceSource()
                     ExecResult.Continue
                 } else ExecResult.Fail
             }
-            EndOp -> {
-                if (checkCondition(state.sourceCursor == source.size)) {
-                    state.advanceOp()
+            RANGE2_OP -> {
+                val start = readShort().toInt()
+                val end = readShort().toInt()
+                if (!done && checkCondition(codePoint in start..end)) {
+                    advanceSource()
                     ExecResult.Continue
                 } else ExecResult.Fail
             }
-            AnyOp -> {
-                if (checkCondition(state.sourceCursor < source.size)) {
+            RANGE4_OP -> {
+                val start = readInt()
+                val end = readInt()
+                if (!done && checkCondition(codePoint in start..end)) {
                     state.advanceSource()
-                    state.advanceOp()
                     ExecResult.Continue
                 } else ExecResult.Fail
             }
-            MatchOp -> ExecResult.Match
-            is Fork -> {
+            FORK_OP -> {
+                val offset = readShort() - 3
                 val newState = state.copy()
-                newState.opcodeCursor += op.offset
+                newState.opcodeCursor += offset
                 pendingStates.add(newState)
-                state.advanceOp()
                 ExecResult.Continue
             }
-            is ForkNow -> {
+            FORK_NOW_OP -> {
+                val offset = readShort() - 3
                 val newState = state.copy()
-                newState.advanceOp()
                 pendingStates.add(newState)
-                state.opcodeCursor += op.offset
+                opcodeCursor += offset
                 ExecResult.Continue
             }
-            is Jump -> {
-                state.opcodeCursor += op.offset + 1
+            JUMP_OP -> {
+                opcodeCursor += readShort() - 3
                 ExecResult.Continue
             }
-            is RangeCheck -> {
-                state.advanceOp()
+            RANGE_CHECK_OP -> {
+                val min = readShort().toInt()
+                val max = readShort().toInt().takeIf { it != 0 }
+
                 val currentValue = rangeCounts.getOrPut(state.opcodeCursor) { 0 }
-                
+
                 rangeResult = when {
-                    currentValue < op.min -> RangeResult.Below
-                    op.max != null && currentValue > op.max -> RangeResult.Above
+                    currentValue < min -> RangeResult.Below
+                    max != null && currentValue > max -> RangeResult.Above
                     else -> RangeResult.In
                 }
 
                 rangeCounts[state.opcodeCursor] = currentValue + 1
-                
+
                 ExecResult.Continue
             }
-            is JumpIfBelowRange -> {
-                state.advanceOp()
+            JUMP_IF_BELOW_RANGE_OP -> {
+                val offset = readShort() - 3
                 if (rangeResult == RangeResult.Below)
-                state.opcodeCursor += op.offset
+                    state.opcodeCursor += offset
                 ExecResult.Continue
             }
-            is JumpIfAboveRange -> {
-                state.advanceOp()
+            JUMP_IF_ABOVE_RANGE_OP -> {
+                val offset = readShort() - 3
                 if (rangeResult == RangeResult.Above)
-                    state.opcodeCursor += op.offset
+                    state.opcodeCursor += offset
                 ExecResult.Continue
             }
-            is LookOp -> {
+            // Note: Don't use `in` here. The Kotlin compiler can't see through it,
+            //       and won't generate a TABLESWITCH for this `when` statement.
+            POSITIVE_LOOKAHEAD_OP,
+            POSITIVE_LOOKBEHIND_OP,
+            NEGATIVE_LOOKAHEAD_OP,
+            NEGATIVE_LOOKBEHIND_OP -> {
                 expect(!negateNext)
-                state.advanceOp()
+
+                val opcodes = Opcodes(readBytes(readShort().toInt()), groupNames)
+
+                val isAhead = op == POSITIVE_LOOKAHEAD_OP || op == NEGATIVE_LOOKAHEAD_OP
+                val isPositive = op == POSITIVE_LOOKAHEAD_OP || op == POSITIVE_LOOKBEHIND_OP
 
                 var newState = MatchState(state.sourceCursor, 0)
 
-                val matched = if (op.isAhead) {
-                    Matcher(source, op.opcodes, flags).exec(newState) != null
+                val matched = if (isAhead) {
+                    Matcher(source, opcodes, flags).exec(newState) != null
                 } else {
                     var matched = false
 
@@ -295,7 +344,9 @@ class Matcher(
                     for (newPos in state.sourceCursor downTo 0) {
                         newState = MatchState(newPos, 0)
 
-                        if (Matcher(source, op.opcodes, flags).exec(newState) != null && newState.sourceCursor == state.sourceCursor) {
+                        if (Matcher(source, opcodes, flags).exec(newState) != null &&
+                            newState.sourceCursor == state.sourceCursor
+                        ) {
                             matched = true
                             break
                         }
@@ -304,12 +355,12 @@ class Matcher(
                     matched
                 }
 
-                if (op.isPositive != matched) {
+                if (isPositive != matched) {
                     ExecResult.Fail
                 } else {
                     // Save any new capturing groups
                     for ((key, value) in newState.groupContents) {
-                        if (key == 0) // Skip the implicit group
+                        if (key.toInt() == 0) // Skip the implicit group
                             continue
 
                         if (key !in state.groupContents)
@@ -319,15 +370,19 @@ class Matcher(
                     ExecResult.Continue
                 }
             }
+            else -> {
+                println("unknown op $op at offset ${opcodeCursor - 1}")
+                unreachable()
+            }
         }
     }
 
     private fun isWordCodepoint(cp: Int): Boolean =
-        cp in 0x41..0x5a /*A-Z*/ || cp in 0x61..0x7a /*a-z*/ || cp in 0x30..0x39 /*0-9*/ || cp == 0x5f /*_*/
+        cp in 'A'.code..'Z'.code || cp in 'a'.code..'z'.code || cp in '0'.code..'9'.code || cp == '_'.code
 
     // TODO: Are these the only characters? Does unicode mode change this?
     private fun isWhitespaceCodepoint(cp: Int): Boolean =
-        cp == 0x20 /* <space> */ || cp == 0x9 /* <tab> */ || cp == 0xa /* <new line> */ || cp == 0xd /* <carriage return> */
+        cp == ' '.code || cp == '\t'.code || cp == '\n'.code || cp == '\r'.code
 
     // Simple function that makes the intent a bit more clear. Easier to read than (a == b) != negateNext
     private fun checkCondition(condition: Boolean) = condition != negateNext
@@ -339,12 +394,11 @@ class Matcher(
     }
 
     private data class GroupState(
-        val index: Int?,
-        val name: String?,
+        val index: Short?,
         var rangeStart: Int,
         var content: MutableList<Int> = mutableListOf(),
     ) {
-        fun copy() = GroupState(index, name, rangeStart, content.toMutableList())
+        fun copy() = GroupState(index, rangeStart, content.toMutableList())
     }
 
     private val MatchState.done: Boolean
@@ -352,9 +406,6 @@ class Matcher(
 
     private val MatchState.codePoint: Int
         get() = source[sourceCursor]
-
-    private val MatchState.op: Opcode
-        get() = opcodes[opcodeCursor]
 
     private fun MatchState.advanceSource(n: Int = 1) {
         repeat(n) {
@@ -364,17 +415,39 @@ class Matcher(
             sourceCursor++
         }
     }
-    
+
+    private fun MatchState.peekByte() = buffer.get(opcodeCursor)
+    private fun MatchState.peekShort() = buffer.getShort(opcodeCursor)
+    private fun MatchState.peekInt() = buffer.getInt(opcodeCursor)
+
+    private fun MatchState.readByte() = buffer.get(opcodeCursor).also {
+        opcodeCursor += 1
+    }
+
+    private fun MatchState.readShort() = buffer.getShort(opcodeCursor).also {
+        opcodeCursor += 2
+    }
+
+    private fun MatchState.readInt() = buffer.getInt(opcodeCursor).also {
+        opcodeCursor += 4
+    }
+
+    private fun MatchState.readBytes(count: Int): ByteArray {
+        val array = ByteArray(count)
+        val prevPos = buffer.position()
+        buffer.position(opcodeCursor)
+        buffer.get(array)
+        opcodeCursor += count
+        buffer.position(prevPos)
+        return array
+    }
+
     private class MatchState(
         var sourceCursor: Int,
         var opcodeCursor: Int,
         val groups: MutableList<GroupState> = mutableListOf(),
-        val groupContents: MutableMap<Any, MatchGroup> = mutableMapOf(),
+        val groupContents: MutableMap<Short, MatchGroup> = mutableMapOf(),
     ) {
-        fun advanceOp() {
-            opcodeCursor++
-        }
-
         fun copy() = MatchState(
             sourceCursor,
             opcodeCursor,

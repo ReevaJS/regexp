@@ -6,7 +6,21 @@ class RegExp(
     val regexCodePoints: IntArray,
     val flags: Set<Flag>,
 ) {
-    private val opcodes = Parser(regexCodePoints, unicode = Flag.Unicode in flags).parse()
+    private val opcodes: Opcodes
+
+    init {
+        val ast = Parser(regexCodePoints, unicode = Flag.Unicode in flags).parse()
+
+        if (DEBUG) {
+            ASTPrinter().print(ast)
+            println()
+        }
+
+        opcodes = Compiler.compile(ast)
+
+        if (DEBUG)
+            OpcodePrinter(opcodes).print()
+    }
 
     constructor(regex: String, vararg flags: Flag) : this(regex.codePoints().toArray(), flags.toSet()) 
 

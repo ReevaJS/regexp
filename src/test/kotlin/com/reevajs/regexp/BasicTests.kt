@@ -16,8 +16,7 @@ object BasicTests {
         testMatches("\\k<a>(?<a>x)", "x") {
             match {
                 this[0] = "x" spanned 0..0
-                this[1] = "x" spanned 0..0
-                this["a"] = "x" spanned 0..0
+                this[1] = "x" spanned 0..0 named "a"
             }
         }
 
@@ -25,9 +24,8 @@ object BasicTests {
         testMatches("(?<name>foo)(bar)+", "foobarbarbar") {
             match {
                 this[0] = "foobarbarbar" spanned 0..11
-                this[1] = "foo" spanned 0..2
+                this[1] = "foo" spanned 0..2 named "name"
                 this[2] = "bar" spanned 9..11
-                this["name"] = "foo" spanned 0..2
             }
         }
 
@@ -100,7 +98,7 @@ object BasicTests {
         fun testMatches(@Language("regexp") regex: String, value: String, vararg flags: RegExp.Flag, matchesBuilder: MatchesBuilder.() -> Unit) {
             val matches = MatchesBuilder().apply(matchesBuilder)
             val results = matches.matches.map {
-                MatchResult(it.indexedGroups, it.namedGroups)
+                MatchResult(it.groups, it.groupNames)
             }
             tests.add(Test(regex, value, flags.toSet(), results))
         }
@@ -115,18 +113,23 @@ object BasicTests {
     }
 
     class MatchBuilder {
-        val indexedGroups = TreeMap<Int, MatchGroup>()
-        val namedGroups = mutableMapOf<String, MatchGroup>()
+        val groups = TreeMap<Int, MatchGroup>()
+        val groupNames = mutableMapOf<Int, String>()
+        private var pendingName: String? = null
 
         operator fun set(index: Int, group: MatchGroup) {
-            indexedGroups[index] = group
-        }
-
-        operator fun set(name: String, group: MatchGroup) {
-            namedGroups[name] = group
+            groups[index] = group
+            if (pendingName != null) {
+                groupNames[index] = pendingName!!
+                pendingName = null
+            }
         }
 
         infix fun String.spanned(range: IntRange) = MatchGroup(codePoints().toArray(), range)
+
+        infix fun MatchGroup.named(name: String) = apply {
+            pendingName = name
+        }
     }
 
     sealed class ExpectedResult
