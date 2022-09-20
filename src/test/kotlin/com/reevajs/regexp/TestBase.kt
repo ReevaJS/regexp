@@ -48,6 +48,13 @@ abstract class TestBase {
         expectCatching { RegExp(regexp, *flags) }.isSuccess()
     }
 
+    protected fun testNotMatches(@Language("regexp") regexp: String, value: String, vararg flags: RegExp.Flag) {
+        val matches = RegExp(regexp, *flags).match(value)
+        expect(matches == null) {
+            "/$regexp/ matches string \"$value\" (${value.codePoints().toArray().joinToString(" ")})"
+        }
+    }
+
     protected fun testMatchesEntire(@Language("regexp") regexp: String, value: String, vararg flags: RegExp.Flag) {
         val matches = RegExp(regexp, *flags).match(value)
         expect(matches != null && matches.isNotEmpty()) {

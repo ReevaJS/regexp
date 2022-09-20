@@ -8,8 +8,10 @@ internal fun getUnicodeClass(clazz: String) = unicodeSets.getOrPut(clazz) {
     UnicodeSet("[\\p{${clazz}}]").freeze()
 }
 
-internal fun isWhitespace(cp: Int) = cp == '\t'.code || cp in 0xa..0xd || cp in 0x2028..0x2029 || 
-    cp == 0xfeff || cp in getUnicodeClass("Space_Separator")
+internal fun isLineSeparator(cp: Int) = cp == 0xa || cp == 0xd || cp in 0x2028..0x2029
+
+internal fun isWhitespace(cp: Int) = cp == '\t'.code || cp in 0xb..0xc  || cp == 0xfeff || 
+    isLineSeparator(cp) || cp in getUnicodeClass("Space_Separator")
 
 @Suppress("SpellCheckingInspection")
 internal val unicodePropertyAliasList = mapOf(

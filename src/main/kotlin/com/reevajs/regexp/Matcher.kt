@@ -18,6 +18,9 @@ class Matcher(
     private val rangeCounts = mutableMapOf<Int, Int>()
     private var rangeResult: RangeResult? = null
 
+    private val dotMatchesNewlines = RegExp.Flag.DotMatchesNewlines in flags
+    private val unicode = RegExp.Flag.Unicode in flags
+
     fun matchSequence(startIndex: Int = 0): Sequence<MatchResult> = sequence {
         var index = startIndex
 
@@ -131,7 +134,20 @@ class Matcher(
                 } else ExecResult.Fail
             }
             ANY_OP -> {
-                if (checkCondition(sourceCursor < source.size)) {
+                val result = run {
+                    if (done)
+                        return@run false
+
+                    if (!dotMatchesNewlines && isLineSeparator(codePoint))
+                        return@run false
+
+                    if (!unicode && codePoint > Char.MAX_VALUE.code)
+                        return@run false
+
+                    true
+                }
+
+                if (checkCondition(result)) {
                     advanceSource()
                     ExecResult.Continue
                 } else ExecResult.Fail
