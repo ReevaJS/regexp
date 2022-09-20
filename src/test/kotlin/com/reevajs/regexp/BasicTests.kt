@@ -4,12 +4,13 @@ import org.intellij.lang.annotations.Language
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.MethodSource
 import strikt.api.expectThat
+import strikt.api.expectThrows
 import strikt.assertions.isEqualTo
 import strikt.assertions.isNull
 import java.util.TreeMap
 
+@Suppress("SpellCheckingInspection", "RegExpUnnecessaryNonCapturingGroup")
 object BasicTests {
-    @Suppress("SpellCheckingInspection")
     @JvmStatic
     fun tests() = TestBuilder().apply {
         // Forward-capturing group
@@ -68,6 +69,16 @@ object BasicTests {
         }
     }.tests
 
+    @JvmStatic
+    fun failures() = mutableListOf(
+        "(",
+        ")",
+        "x{0}{0}",
+        "x{2,1}",
+        "[b-a]",
+        "a+*",
+    )
+
     @ParameterizedTest
     @MethodSource("tests")
     fun runTests(test: Test) {
@@ -86,6 +97,12 @@ object BasicTests {
                 expectThat(expected).isEqualTo(actual)
             }
         }
+    }
+
+    @ParameterizedTest
+    @MethodSource("failures")
+    fun runFailures(regex: String) {
+        expectThrows<RegexSyntaxError> { RegExp(regex) }
     }
 
     class TestBuilder {
