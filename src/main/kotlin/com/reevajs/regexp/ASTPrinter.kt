@@ -36,25 +36,22 @@ class ASTPrinter(private var indent: Int = 0) {
                 println(" $start..$end")
             }
             is ZeroOrOneNode -> {
-                println(" ${if (node.lazy) "lazy" else ""}")
+                println(if (node.lazy) " lazy" else "")
                 indented { print(node.node) }
             }
             is ZeroOrMoreNode -> {
-                println(" ${if (node.lazy) "lazy" else ""}")
+                println(if (node.lazy) " lazy" else "")
                 indented { print(node.node) }
             }
             is OneOrMoreNode -> {
-                println(" ${if (node.lazy) "lazy" else ""}")
+                println(if (node.lazy) " lazy" else "")
                 indented { print(node.node) }
             }
             is RepetitionNode -> {
-                val min = node.min.toInt().let {
-                    if (it < Char.MAX_VALUE.code) it.toChar().toString() else it.toString(radix = 16)
-                }
-                val max = node.max?.toInt()?.let {
-                    if (it < Char.MAX_VALUE.code) it.toChar().toString() else it.toString(radix = 16)
-                } ?: "∞"
-                println(" ${if (node.lazy) "lazy" else ""} $min..$max")
+                val min = node.min.toString()
+                val max = node.max?.toString() ?: "∞"
+                println("${if (node.lazy) " lazy" else ""} $min..$max")
+                indented { print(node.node) }
             }
             is AlternationNode -> {
                 println()
