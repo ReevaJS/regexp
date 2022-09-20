@@ -34,7 +34,9 @@ class Parser(private val codePoints: IntArray, private val unicode: Boolean) {
 
     private fun parseSingle() {
         parseNode()
-        tryParseSecondary()
+
+        @Suppress("ControlFlowWithEmptyBody")
+        while (tryParseSecondary());
     }
 
     private fun parseNode() {
@@ -163,22 +165,31 @@ class Parser(private val codePoints: IntArray, private val unicode: Boolean) {
         }
     }
 
-    private fun tryParseSecondary() {
+    private fun tryParseSecondary(): Boolean {
         if (done || nodeBuffers.isEmpty())
-            return
+            return false
 
-        when (codePoint) {
+        fun ensureValidTarget(node: ASTNode) = node.let {
+            if (node is QuantifierNode)
+                error("Invalid quantifier")
+            it
+        }
+
+        return when (codePoint) {
             '?'.code -> {
                 cursor++
-                +ZeroOrOneNode(popNode(), consumeIf('?'.code))
+                +ZeroOrOneNode(ensureValidTarget(popNode()), consumeIf('?'.code))
+                true
             }
             '*'.code -> {
                 cursor++
-                +ZeroOrMoreNode(popNode(), consumeIf('?'.code))
+                +ZeroOrMoreNode(ensureValidTarget(popNode()), consumeIf('?'.code))
+                true
             }
             '+'.code -> {
                 cursor++
-                +OneOrMoreNode(popNode(), consumeIf('?'.code))
+                +OneOrMoreNode(ensureValidTarget(popNode()), consumeIf('?'.code))
+                true
             }
             '|'.code -> {
                 cursor++
@@ -196,14 +207,16 @@ class Parser(private val codePoints: IntArray, private val unicode: Boolean) {
                 pushNodeBuffer()
 
                 +AlternationNode(lhs, rhs)
+                true
             }
             '{'.code -> {
                 cursor++
                 val start = codePoint
 
-                fun incomplete() {
+                fun incomplete(): Boolean {
                     cursor = start
                     +CodePointNode('{'.code)
+                    return false
                 }
 
                 val firstBound = parseNumber(1, 8, base = 10)?.let {
@@ -227,7 +240,7 @@ class Parser(private val codePoints: IntArray, private val unicode: Boolean) {
                 if (secondBound != null && firstBound > secondBound)
                     error("Quantifier range is out of order")
 
-                val node = popNode()
+                val node = ensureValidTarget(popNode())
                 if (node is RepetitionNode)
                     error("Invalid repetition quantifier")
 
@@ -235,12 +248,10 @@ class Parser(private val codePoints: IntArray, private val unicode: Boolean) {
                 if (secondBound != null)
                     expect(secondBound < Short.MAX_VALUE)
 
-                when {
-                    firstBound == 0 && secondBound == 0 -> {}
-                    firstBound == secondBound -> +node
-                    else -> +RepetitionNode(node, firstBound.toShort(), secondBound?.toShort(), consumeIf('?'.code))
-                }
+                +RepetitionNode(node, firstBound.toShort(), secondBound?.toShort(), consumeIf('?'.code))
+                true
             }
+            else -> false
         }
     }
 

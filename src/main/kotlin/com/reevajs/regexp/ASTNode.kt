@@ -38,13 +38,15 @@ class InvertedCharacterClassNode(val nodes: List<ASTNode>) : ASTNode()
 
 class CodePointRangeNode(val start: Int, val end: Int) : ASTNode()
 
-data class ZeroOrOneNode(val node: ASTNode, val lazy: Boolean) : ASTNode()
+interface QuantifierNode
 
-data class ZeroOrMoreNode(val node: ASTNode, val lazy: Boolean) : ASTNode()
+data class ZeroOrOneNode(val node: ASTNode, val lazy: Boolean) : ASTNode(), QuantifierNode
 
-data class OneOrMoreNode(val node: ASTNode, val lazy: Boolean) : ASTNode()
+data class ZeroOrMoreNode(val node: ASTNode, val lazy: Boolean) : ASTNode(), QuantifierNode
 
-data class RepetitionNode(val node: ASTNode, val min: Short, val max: Short?, val lazy: Boolean) : ASTNode()
+data class OneOrMoreNode(val node: ASTNode, val lazy: Boolean) : ASTNode(), QuantifierNode
+
+data class RepetitionNode(val node: ASTNode, val min: Short, val max: Short?, val lazy: Boolean) : ASTNode(), QuantifierNode
 
 data class AlternationNode(val lhs: ASTNode, val rhs: ASTNode) : ASTNode()
 

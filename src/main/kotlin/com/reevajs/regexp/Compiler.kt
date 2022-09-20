@@ -150,6 +150,14 @@ class Compiler(private val root: RootNode) {
                 writeShort((-count).toShort())
             }
             is RepetitionNode -> {
+                if (node.min == 0.toShort() && node.max == 0.toShort())
+                    return@with
+
+                if (node.min == 1.toShort() && node.max == 1.toShort()) {
+                    compileNode(node.node)
+                    return@with
+                }
+
                 /*
                  * RANGE_CHECK
                  * MIN

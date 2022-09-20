@@ -3,7 +3,7 @@ package com.reevajs.regexp
 import kotlin.contracts.ExperimentalContracts
 import kotlin.contracts.contract
 
-const val DEBUG = true
+const val DEBUG = false
 
 fun unreachable(): Nothing {
     throw IllegalStateException("Encountered unreachable() call")
