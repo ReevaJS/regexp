@@ -1,7 +1,18 @@
 package com.reevajs.regexp
 
+import com.ibm.icu.text.UnicodeSet
+
+private val unicodeSets = mutableMapOf<String, UnicodeSet>()
+
+internal fun getUnicodeClass(clazz: String) = unicodeSets.getOrPut(clazz) {
+    UnicodeSet("[\\p{${clazz}}]").freeze()
+}
+
+internal fun isWhitespace(cp: Int) = cp == '\t'.code || cp in 0xa..0xd || cp in 0x2028..0x2029 || 
+    cp == 0xfeff || cp in getUnicodeClass("Space_Separator")
+
 @Suppress("SpellCheckingInspection")
-val unicodePropertyAliasList = mapOf(
+internal val unicodePropertyAliasList = mapOf(
     "General_Category" to "General_Category",
     "gc" to "General_Category",
     "Script" to "Script",
@@ -110,7 +121,7 @@ val unicodePropertyAliasList = mapOf(
 )
 
 @Suppress("SpellCheckingInspection")
-val unicodeValueAliasesList = mapOf(
+internal  val unicodeValueAliasesList = mapOf(
     "Cased_Letter" to "Cased_Letter",
     "LC" to "Cased_Letter",
     "Close_Punctuation" to "Close_Punctuation",

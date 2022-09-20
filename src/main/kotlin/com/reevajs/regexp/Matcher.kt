@@ -1,6 +1,5 @@
 package com.reevajs.regexp
 
-import com.ibm.icu.text.UnicodeSet
 import java.nio.ByteBuffer
 import java.util.*
 import kotlin.math.max
@@ -167,7 +166,7 @@ class Matcher(
                 } else ExecResult.Fail
             }
             WHITESPACE_OP -> {
-                if (!done && checkCondition(isWhitespaceCodepoint(codePoint))) {
+                if (!done && checkCondition(isWhitespace(codePoint))) {
                     advanceSource()
                     ExecResult.Continue
                 } else ExecResult.Fail
@@ -180,9 +179,7 @@ class Matcher(
                         append(readByte().toInt().toChar())
                     }
                 }
-                val set = unicodeSets.getOrPut(clazz) {
-                    UnicodeSet("[\\p{${clazz}}]").freeze()
-                }
+                val set = getUnicodeClass(clazz)
 
                 if (!done && checkCondition(codePoint in set)) {
                     advanceSource()
@@ -380,10 +377,6 @@ class Matcher(
     private fun isWordCodepoint(cp: Int): Boolean =
         cp in 'A'.code..'Z'.code || cp in 'a'.code..'z'.code || cp in '0'.code..'9'.code || cp == '_'.code
 
-    // TODO: Are these the only characters? Does unicode mode change this?
-    private fun isWhitespaceCodepoint(cp: Int): Boolean =
-        cp == ' '.code || cp == '\t'.code || cp == '\n'.code || cp == '\r'.code
-
     // Simple function that makes the intent a bit more clear. Easier to read than (a == b) != negateNext
     private fun checkCondition(condition: Boolean) = condition != negateNext
 
@@ -462,9 +455,5 @@ class Matcher(
         Below,
         In,
         Above
-    }
-
-    companion object {
-        private val unicodeSets = mutableMapOf<String, UnicodeSet>()
     }
 }
