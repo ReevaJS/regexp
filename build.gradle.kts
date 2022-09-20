@@ -1,5 +1,7 @@
 import java.io.ByteArrayOutputStream
 import org.gradle.jvm.tasks.Jar
+import org.gradle.api.tasks.testing.logging.TestExceptionFormat
+import org.gradle.api.tasks.testing.logging.TestLogEvent
 
 plugins {
     kotlin("jvm") version "1.7.10"
@@ -44,6 +46,16 @@ tasks {
     compileTestKotlin {
         kotlinOptions {
             jvmTarget = "1.8"
+        }
+    }
+
+    withType(Test::class) {
+        testLogging {
+            events = setOf(TestLogEvent.FAILED, TestLogEvent.SKIPPED, TestLogEvent.STANDARD_OUT)
+            exceptionFormat = TestExceptionFormat.FULL
+            showExceptions = true
+            showCauses = true
+            showStackTraces = true
         }
     }
 }
