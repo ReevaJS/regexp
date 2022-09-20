@@ -161,7 +161,7 @@ class Matcher(
                 } else ExecResult.Fail
             }
             DIGIT_OP -> {
-                if (!done && checkCondition(codePoint in '0'.code..'1'.code)) {
+                if (!done && checkCondition(codePoint in '0'.code..'9'.code)) {
                     advanceSource()
                     ExecResult.Continue
                 } else ExecResult.Fail
