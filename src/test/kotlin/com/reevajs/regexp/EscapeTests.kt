@@ -39,7 +39,7 @@ class EscapeTests : TestBase() {
     fun `test word escape`() = escapeTest("\\w", 0x5f, 0x30..0x39, 0x41..0x5a, 0x61..0x7a)
 
     @Test
-    fun `test neated word escape`() = escapeTest(
+    fun `test nested word escape`() = escapeTest(
         "\\W",
         0x00dc00..0x00dfff,
         0x000000..0x00002f,
