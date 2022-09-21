@@ -16,7 +16,6 @@ class Matcher(
     private val pendingStates = mutableListOf<MatchState>()
     private var negateNext = false
     private val rangeCounts = mutableMapOf<Int, Int>()
-    private var rangeResult: RangeResult? = null
 
     private val dotMatchesNewlines = RegExp.Flag.DotMatchesNewlines in flags
     private val unicode = RegExp.Flag.Unicode in flags
@@ -305,32 +304,23 @@ class Matcher(
                 opcodeCursor += readShort() - 3
                 ExecResult.Continue
             }
-            RANGE_CHECK_OP -> {
+            RANGE_JUMP_OP -> {
+                val opOffset = state.opcodeCursor - 1
+
                 val min = readShort().toInt()
                 val max = readShort().toInt().takeIf { it != 0 }
+                val belowOffset = readShort().toInt()
+                val aboveOffset = readShort().toInt()
 
-                val currentValue = rangeCounts.getOrPut(state.opcodeCursor) { 0 }
+                val currentValue = rangeCounts.getOrPut(opOffset) { 0 }
 
-                rangeResult = when {
-                    currentValue < min -> RangeResult.Below
-                    max != null && currentValue > max -> RangeResult.Above
-                    else -> RangeResult.In
+                when {
+                    currentValue < min -> opcodeCursor = opOffset + belowOffset
+                    max != null && currentValue >= max -> opcodeCursor = opOffset + aboveOffset
                 }
 
-                rangeCounts[state.opcodeCursor] = currentValue + 1
+                rangeCounts[opOffset] = currentValue + 1
 
-                ExecResult.Continue
-            }
-            JUMP_IF_BELOW_RANGE_OP -> {
-                val offset = readShort() - 3
-                if (rangeResult == RangeResult.Below)
-                    state.opcodeCursor += offset
-                ExecResult.Continue
-            }
-            JUMP_IF_ABOVE_RANGE_OP -> {
-                val offset = readShort() - 3
-                if (rangeResult == RangeResult.Above)
-                    state.opcodeCursor += offset
                 ExecResult.Continue
             }
             // Note: Don't use `in` here. The Kotlin compiler can't see through it,
@@ -465,11 +455,5 @@ class Matcher(
         )
 
         override fun toString() = "MatchState(SP=$sourceCursor, OP=$opcodeCursor)"
-    }
-
-    private enum class RangeResult {
-        Below,
-        In,
-        Above
     }
 }

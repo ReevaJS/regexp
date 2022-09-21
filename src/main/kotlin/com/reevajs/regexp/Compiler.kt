@@ -159,41 +159,37 @@ class Compiler(private val root: RootNode) {
                 }
 
                 /*
-                 * RANGE_CHECK
-                 * MIN
-                 * MAX (0 if unbounded)
-                 * JUMP_IF_BELOW_RANGE 9
-                 * JUMP_IF_ABOVE_RANGE X+9
-                 * FORK/FORK_NOW X+1
+                 * RANGE_JUMP MIN MAX (0 if unbounded) 12 X+15
+                 * FORK/FORK_NOW X+6
                  * <X bytes>
-                 * JUMP -X-14
+                 * JUMP -X-12
                  */
 
-                writeByte(RANGE_CHECK_OP)
+                writeByte(RANGE_JUMP_OP)
                 writeShort(node.min)
                 writeShort(node.max ?: 0)
-
-                writeByte(JUMP_IF_BELOW_RANGE_OP)
-                writeShort(9)
-
-                writeByte(JUMP_IF_ABOVE_RANGE_OP)
-                val jumpOffset = position
+                writeShort(12)
+                val firstOffsetPos = position
                 writeShort(0)
 
-                writeByte(if (node.lazy) FORK_OP else FORK_NOW_OP)
-                val forkOffset = position
+                writeByte(if (node.lazy) FORK_NOW_OP else FORK_OP)
+                val secondOffsetPos = position
                 writeShort(0)
 
                 val count = compileAndGetCount(node.node)
-                expect(count + 9 < Short.MAX_VALUE)
-                expect((-count - 14) > Short.MIN_VALUE)
+                expect(count + 15 < Short.MAX_VALUE)
+                expect((-count - 12) > Short.MIN_VALUE)
+
+                writeByte(JUMP_OP)
+                writeShort((-count - 12).toShort())
+
                 val end = position
 
-                position = jumpOffset
-                writeShort((count + 9).toShort())
+                position = firstOffsetPos
+                writeShort((count + 15).toShort())
 
-                position = forkOffset
-                writeShort((-count - 14).toShort())
+                position = secondOffsetPos
+                writeShort((count + 6).toShort())
 
                 position = end
             }

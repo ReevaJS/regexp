@@ -122,48 +122,38 @@ const val FORK_NOW_OP: Byte = 24
 const val JUMP_OP: Byte = 25
 
 /**
- * RANGE_CHECK_OP
+ * RANGE_JUMP_OP
  * min: SHORT
  * max: SHORT
+ * below offset: SHORT
+ * above offset: SHORT
  */
-const val RANGE_CHECK_OP: Byte = 26
-
-/**
- * JUMP_IF_BELOW_RANGE_OP
- * offset: SHORT
- */
-const val JUMP_IF_BELOW_RANGE_OP: Byte = 27
-
-/**
- * JUMP_IF_ABOVE_RANGE_OP
- * offset: SHORT
- */
-const val JUMP_IF_ABOVE_RANGE_OP: Byte = 28
+const val RANGE_JUMP_OP: Byte = 26
 
 /**
  * POSITIVE_LOOKAHEAD_OP
  * num opcodes: SHORT
  * <num opcodes>
  */
-const val POSITIVE_LOOKAHEAD_OP: Byte = 29
+const val POSITIVE_LOOKAHEAD_OP: Byte = 27
 
 /**
  * POSITIVE_LOOKBEHIND_OP
  * num opcodes: SHORT
  * <num opcodes>
  */
-const val POSITIVE_LOOKBEHIND_OP: Byte = 30
+const val POSITIVE_LOOKBEHIND_OP: Byte = 28
 
 /**
  * NEGATIVE_LOOKAHEAD_OP
  * num opcodes: SHORT
  * <num opcodes>
  */
-const val NEGATIVE_LOOKAHEAD_OP: Byte = 31
+const val NEGATIVE_LOOKAHEAD_OP: Byte = 29
 
 /**
  * NEGATIVE_LOOKBEHIND_OP
  * num opcodes: SHORT
  * <num opcodes>
  */
-const val NEGATIVE_LOOKBEHIND_OP: Byte = 32
+const val NEGATIVE_LOOKBEHIND_OP: Byte = 30

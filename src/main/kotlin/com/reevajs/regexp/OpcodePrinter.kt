@@ -56,9 +56,7 @@ class OpcodePrinter(private val opcodes: Opcodes, private val indent: Int = 0) {
                 FORK_OP -> println("FORK ${bytes.short}")
                 FORK_NOW_OP -> println("FORK_NOW ${bytes.short}")
                 JUMP_OP -> println("JUMP ${bytes.short}")
-                RANGE_CHECK_OP -> println("RANGE_CHECK ${bytes.short}..${bytes.short}")
-                JUMP_IF_BELOW_RANGE_OP -> println("JUMP_IF_BELOW_RANGE ${bytes.short}")
-                JUMP_IF_ABOVE_RANGE_OP -> println("JUMP_IF_ABOVE_RANGE ${bytes.short}")
+                RANGE_JUMP_OP -> println("RANGE_CHECK ${bytes.short}..${bytes.short} below=${bytes.short} above=${bytes.short}")
                 in POSITIVE_LOOKAHEAD_OP..NEGATIVE_LOOKBEHIND_OP -> {
                     val numOpcodes = bytes.short.toInt()
                     val array = ByteArray(numOpcodes)
