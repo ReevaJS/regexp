@@ -354,7 +354,12 @@ class Matcher(
                             continue
 
                         if (key.toShort() !in state.groupContents)
-                            state.groupContents[key.toShort()] = value
+                            state.groupContents[key.toShort()] = value.let {
+                                if (isAhead) it else MatchGroup(
+                                    it.codePoints.reversedArray(),
+                                    (source.lastIndex - it.range.last)..(source.lastIndex - it.range.first)
+                                )
+                            }
                     }
 
                     ExecResult.Continue
