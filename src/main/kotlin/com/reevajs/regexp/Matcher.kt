@@ -82,7 +82,8 @@ class Matcher(
 
         buffer.position(position)
 
-        return when (val op = readByte()) {
+        val op = readByte()
+        return when (op) {
             START_GROUP_OP -> {
                 groups.add(GroupState(readShort(), sourceCursor))
                 ExecResult.Continue
@@ -301,7 +302,8 @@ class Matcher(
                 ExecResult.Continue
             }
             JUMP_OP -> {
-                opcodeCursor += readShort() - 3
+                val offset = readShort() - 3
+                opcodeCursor += offset
                 ExecResult.Continue
             }
             RANGE_JUMP_OP -> {
@@ -336,38 +338,24 @@ class Matcher(
                 val isAhead = op == POSITIVE_LOOKAHEAD_OP || op == NEGATIVE_LOOKAHEAD_OP
                 val isPositive = op == POSITIVE_LOOKAHEAD_OP || op == POSITIVE_LOOKBEHIND_OP
 
-                var newState = MatchState(state.sourceCursor, 0)
-
-                val matched = if (isAhead) {
-                    Matcher(source, opcodes, flags).exec(newState) != null
+                val match = if (isAhead) {
+                    Matcher(source, opcodes, flags).match(state.sourceCursor)
                 } else {
-                    var matched = false
-
-                    // TODO: Determine opcode min/max length here
-                    for (newPos in state.sourceCursor downTo 0) {
-                        newState = MatchState(newPos, 0)
-
-                        if (Matcher(source, opcodes, flags).exec(newState) != null &&
-                            newState.sourceCursor == state.sourceCursor
-                        ) {
-                            matched = true
-                            break
-                        }
-                    }
-
-                    matched
+                    val reversedSource = source.reversedArray()
+                    val reversedCursor = source.size - sourceCursor
+                    Matcher(reversedSource, opcodes, flags).match(reversedCursor)
                 }
 
-                if (isPositive != matched) {
+                if (isPositive != (match != null)) {
                     ExecResult.Fail
                 } else {
                     // Save any new capturing groups
-                    for ((key, value) in newState.groupContents) {
-                        if (key.toInt() == 0) // Skip the implicit group
+                    for ((key, value) in match?.groups.orEmpty()) {
+                        if (key == 0) // Skip the implicit group
                             continue
 
-                        if (key !in state.groupContents)
-                            state.groupContents[key] = value
+                        if (key.toShort() !in state.groupContents)
+                            state.groupContents[key.toShort()] = value
                     }
 
                     ExecResult.Continue
@@ -401,7 +389,7 @@ class Matcher(
     }
 
     private val MatchState.done: Boolean
-        get() = sourceCursor > source.lastIndex
+        get() = sourceCursor !in source.indices
 
     private val MatchState.codePoint: Int
         get() = source[sourceCursor]

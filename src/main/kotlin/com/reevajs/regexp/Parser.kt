@@ -27,7 +27,7 @@ class Parser(private val codePoints: IntArray, private val unicode: Boolean) {
             ref.index = namedGroups.entries.first { it.value == name }.key
         }
 
-        return RootNode(namedGroups, popNodeBuffer() + MatchNode).also {
+        return RootNode(namedGroups, nextGroupIndex, popNodeBuffer() + MatchNode).also {
             expect(nodeBuffers.isEmpty())
         }
     }
@@ -80,8 +80,8 @@ class Parser(private val codePoints: IntArray, private val unicode: Boolean) {
                     "?:" -> +GroupNode(null, nodes)
                     "?=" -> +PositiveLookaheadNode(nodes + MatchNode)
                     "?!" -> +NegativeLookaheadNode(nodes + MatchNode)
-                    "?<=" -> +PositiveLookbehindNode(nodes + MatchNode)
-                    "?<!" -> +NegativeLookbehindNode(nodes + MatchNode)
+                    "?<=" -> +PositiveLookbehindNode(nodes.asReversed().map(ASTNode::asReversed) + MatchNode)
+                    "?<!" -> +NegativeLookbehindNode(nodes.asReversed().map(ASTNode::asReversed) + MatchNode)
                     else -> +GroupNode(groupIndex!!, nodes)
                 }
             }

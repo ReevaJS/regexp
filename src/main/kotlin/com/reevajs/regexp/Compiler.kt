@@ -56,7 +56,7 @@ class Compiler(private val root: RootNode) {
                 }
             }
             is BackReferenceNode -> {
-                if (node.index in root.groupNames) {
+                if (node.index < root.numGroups) {
                     writeByte(BACK_REFERENCE_OP)
                     writeShort(node.index)
                 } else if (node.index <= Byte.MAX_VALUE) {
@@ -70,13 +70,13 @@ class Compiler(private val root: RootNode) {
             is CharacterClassNode -> {
                 writeByte(CHAR_CLASS_OP)
                 writeShort(node.nodes.size.toShort())
-                val opcodes = Compiler(RootNode(root.groupNames, node.nodes)).compile()
+                val opcodes = Compiler(root.copy(nodes = node.nodes)).compile()
                 writeShort(opcodes.size.toShort())
                 writeBytes(opcodes)
             }
             is InvertedCharacterClassNode -> {
                 writeByte(INVERTED_CHAR_CLASS_OP)
-                val opcodes = Compiler(RootNode(root.groupNames, node.nodes)).compile()
+                val opcodes = Compiler(root.copy(nodes = node.nodes)).compile()
                 writeBytes(opcodes)
             }
             is CodePointRangeNode -> when {
@@ -233,7 +233,7 @@ class Compiler(private val root: RootNode) {
                     is NegativeLookbehindNode -> NEGATIVE_LOOKBEHIND_OP
                 })
 
-                val opcodes = Compiler(RootNode(root.groupNames, node.nodes)).compile()
+                val opcodes = Compiler(root.copy(nodes = node.nodes)).compile()
                 expect(opcodes.size < Short.MAX_VALUE)
                 writeShort(opcodes.size.toShort())
                 writeBytes(opcodes)
