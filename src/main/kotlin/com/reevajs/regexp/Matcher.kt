@@ -288,22 +288,20 @@ class Matcher(
                 } else ExecResult.Fail
             }
             FORK_OP -> {
-                val offset = readShort() - 3
                 val newState = state.copy()
-                newState.opcodeCursor += offset
+                newState.opcodeCursor += readShort()
                 pendingStates.add(newState)
                 ExecResult.Continue
             }
             FORK_NOW_OP -> {
-                val offset = readShort() - 3
+                val offset = readShort() - 2 // the offset is relative to itself
                 val newState = state.copy()
                 pendingStates.add(newState)
                 opcodeCursor += offset
                 ExecResult.Continue
             }
             JUMP_OP -> {
-                val offset = readShort() - 3
-                opcodeCursor += offset
+                opcodeCursor += readShort()
                 ExecResult.Continue
             }
             RANGE_JUMP_OP -> {
@@ -311,14 +309,14 @@ class Matcher(
 
                 val min = readShort().toInt()
                 val max = readShort().toInt().takeIf { it != 0 }
-                val belowOffset = readShort().toInt()
-                val aboveOffset = readShort().toInt()
+                val belowOffset = opcodeCursor + readShort().toInt()
+                val aboveOffset = opcodeCursor + readShort().toInt()
 
                 val currentValue = rangeCounts.getOrPut(opOffset) { 0 }
 
                 when {
-                    currentValue < min -> opcodeCursor = opOffset + belowOffset
-                    max != null && currentValue >= max -> opcodeCursor = opOffset + aboveOffset
+                    currentValue < min -> opcodeCursor = belowOffset
+                    max != null && currentValue >= max -> opcodeCursor = aboveOffset
                 }
 
                 rangeCounts[opOffset] = currentValue + 1

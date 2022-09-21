@@ -98,56 +98,50 @@ class Compiler(private val root: RootNode) {
             }
             is ZeroOrOneNode -> {
                 /*
-                 * FORK/FORK_NOW X+3
+                 * FORK/FORK_NOW _END
                  * <X bytes>
+                 * END_:
                  */
 
-                writeByte(if (node.lazy) FORK_NOW_OP else FORK_OP)
-                val offset = position
-                writeShort(0)
-
-                val count = compileAndGetCount(node.node)
-
-                expect(count + 3 < Short.MAX_VALUE)
-                position = offset
-                writeShort((count + 3).toShort())
-                position = offset + count
+                val end = Label()
+                writeJump(if (node.lazy) FORK_NOW_OP else FORK_OP, end)
+                compileNode(node.node)
+                placeLabel(end)
             }
             is ZeroOrMoreNode -> {
                 /*
-                 * FORK/FORK_NOW X+6
+                 * FORK/FORK_NOW _END
+                 * _BYTES:
                  * <X bytes>
-                 * FORK_NOW/FORK -X
+                 * FORK_NOW/FORK _BYTES
+                 * _END:
                  */
 
                 val firstOp = if (node.lazy) FORK_NOW_OP else FORK_OP
                 val secondOp = if (node.lazy) FORK_OP else FORK_NOW_OP
 
-                writeByte(firstOp)
-                val offset = position
-                writeShort(0)
+                val bytesLabel = Label()
+                val endLabel = Label()
 
-                val count = compileAndGetCount(node.node)
-                expect(count + 6 < Short.MAX_VALUE)
-                expect((-count) > Short.MIN_VALUE)
-                writeByte(secondOp)
-                writeShort((-count).toShort())
-                
-                val end = position
-                position = offset
-                writeShort((count + 6).toShort())
-                position = end
+                writeJump(firstOp, endLabel)
+                placeLabel(bytesLabel)
+
+                compileNode(node.node)
+
+                writeJump(secondOp, bytesLabel)
+                placeLabel(endLabel)
             }
             is OneOrMoreNode -> {
                 /*
+                 * _BYTES:
                  * <X bytes>
-                 * FORK/FORK_NOW -X
+                 * FORK/FORK_NOW _BYTES
                  */
 
-                val count = compileAndGetCount(node.node)
-                expect((-count) > Short.MIN_VALUE)
-                writeByte(if (node.lazy) FORK_OP else FORK_NOW_OP)
-                writeShort((-count).toShort())
+                val label = Label()
+                placeLabel(label)
+                compileNode(node.node)
+                writeJump(if (node.lazy) FORK_OP else FORK_NOW_OP, label)
             }
             is RepetitionNode -> {
                 if (node.min == 0.toShort() && node.max == 0.toShort())
@@ -159,71 +153,56 @@ class Compiler(private val root: RootNode) {
                 }
 
                 /*
-                 * RANGE_JUMP MIN MAX (0 if unbounded) 12 X+15
-                 * FORK/FORK_NOW X+6
+                 * _START:
+                 * RANGE_JUMP MIN MAX _BYTES _END
+                 * FORK/FORK_NOW _END
+                 * _BYTES:
                  * <X bytes>
-                 * JUMP -X-12
+                 * JUMP _START
+                 * _END:
                  */
 
+                val startLabel = Label()
+                val bytesLabel = Label()
+                val endLabel = Label()
+
+                placeLabel(startLabel)
                 writeByte(RANGE_JUMP_OP)
                 writeShort(node.min)
                 writeShort(node.max ?: 0)
-                writeShort(12)
-                val firstOffsetPos = position
-                writeShort(0)
+                writeJumpRef(bytesLabel)
+                writeJumpRef(endLabel)
+                
+                writeJump(if (node.lazy) FORK_NOW_OP else FORK_OP, endLabel)
+                placeLabel(bytesLabel)
 
-                writeByte(if (node.lazy) FORK_NOW_OP else FORK_OP)
-                val secondOffsetPos = position
-                writeShort(0)
+                compileNode(node.node)
+                writeJump(JUMP_OP, startLabel)
 
-                val count = compileAndGetCount(node.node)
-                expect(count + 15 < Short.MAX_VALUE)
-                expect((-count - 12) > Short.MIN_VALUE)
-
-                writeByte(JUMP_OP)
-                writeShort((-count - 12).toShort())
-
-                val end = position
-
-                position = firstOffsetPos
-                writeShort((count + 15).toShort())
-
-                position = secondOffsetPos
-                writeShort((count + 6).toShort())
-
-                position = end
+                placeLabel(endLabel)
             }
             is AlternationNode -> {
                 /*
-                 * FORK X+6
+                 * FORK _RHS
+                 * _LHS:
                  * <X opcodes>
-                 * JUMP Y+3
+                 * JUMP _END
+                 * _RHS:
                  * <Y opcodes>
+                 * _END
                  */
 
-                writeByte(FORK_OP)
-                val forkOffset = position
-                writeShort(0)
+                val lhsLabel = Label()
+                val rhsLabel = Label()
+                val endLabel = Label()
 
-                val count1 = compileAndGetCount(node.lhs)
-                expect(count1 + 6 < Short.MAX_VALUE)
-
-                writeByte(JUMP_OP)
-                val jumpOffset = position
-                writeShort(0)
-
-                val count2 = compileAndGetCount(node.rhs)
-                expect(count2 + 3 < Short.MAX_VALUE)
-
-                val end = position
-
-                position = forkOffset
-                writeShort((count1 + 6).toShort())
-
-                position = jumpOffset
-                writeShort((count2 + 3).toShort())
-
-                position = end
+                writeJump(FORK_OP, rhsLabel)
+                placeLabel(lhsLabel)
+                compileNode(node.lhs)
+                writeJump(JUMP_OP, endLabel)
+                placeLabel(rhsLabel)
+                compileNode(node.rhs)
+                placeLabel(endLabel)
             }
             is LookNode -> {
                 writeByte(when (node) {
@@ -241,10 +220,32 @@ class Compiler(private val root: RootNode) {
         }
     }
 
-    private fun compileAndGetCount(node: ASTNode): Int {
-        val start = buffer.position
-        compileNode(node)
-        return buffer.position - start
+    private fun writeJump(op: Byte, label: Label) {
+        buffer.writeByte(op)
+        writeJumpRef(label)
+    }
+
+    private fun writeJumpRef(label: Label) {
+        if (label.position != null) {
+            val offset = label.position!! - buffer.position
+            expect(offset in Short.MIN_VALUE..Short.MAX_VALUE)
+            buffer.writeShort(offset.toShort())
+        } else {
+            label.offsetsToWritePositionTo.add(buffer.position)
+            buffer.writeShort(0)
+        }
+    }
+
+    private fun placeLabel(label: Label) {
+        label.position = buffer.position
+
+        for (offset in label.offsetsToWritePositionTo)
+            buffer.buffer.putShort(offset, (buffer.position - offset).toShort())
+    }
+
+    class Label {
+        val offsetsToWritePositionTo = mutableListOf<Int>()
+        var position: Int? = null
     }
 
     companion object {
