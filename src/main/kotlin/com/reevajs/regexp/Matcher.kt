@@ -40,6 +40,7 @@ class Matcher(
 
     fun match(startIndex: Int = 0): MatchResult? {
         pendingStates.clear()
+        rangeCounts.clear()
         return exec(MatchState(startIndex, 0))
     }
 
