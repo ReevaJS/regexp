@@ -22,6 +22,7 @@ class OpcodePrinter(private val opcodes: Opcodes, private val indent: Int = 0) {
                 CODEPOINT4_OP -> println("CODEPOINT4 ${bytes.int}")
                 START_OP -> println("START")
                 END_OP -> println("END")
+                ANY_OP -> println("ANY")
                 NEGATE_NEXT_OP -> println("NEGATE_NEXT")
                 WORD_OP -> println("WORD")
                 WORD_BOUNDARY_OP -> println("WORD_BOUNDARY")
