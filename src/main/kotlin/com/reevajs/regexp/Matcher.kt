@@ -1,5 +1,6 @@
 package com.reevajs.regexp
 
+import com.reevajs.regexp.compiler.*
 import java.nio.ByteBuffer
 import java.util.*
 import kotlin.math.max

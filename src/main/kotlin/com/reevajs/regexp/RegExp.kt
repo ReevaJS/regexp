@@ -2,6 +2,9 @@ package com.reevajs.regexp
 
 import com.reevajs.regexp.parser.ASTPrinter
 import com.reevajs.regexp.parser.Parser
+import com.reevajs.regexp.compiler.Compiler
+import com.reevajs.regexp.compiler.Opcodes
+import com.reevajs.regexp.compiler.OpcodePrinter
 
 @Suppress("unused", "MemberVisibilityCanBePrivate")
 class RegExp(

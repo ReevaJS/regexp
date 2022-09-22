@@ -1,5 +1,6 @@
-package com.reevajs.regexp
+package com.reevajs.regexp.compiler
 
+import com.reevajs.regexp.unreachable
 import java.nio.ByteBuffer
 
 class OpcodePrinter(private val opcodes: Opcodes, private val indent: Int = 0) {

@@ -1,4 +1,4 @@
-package com.reevajs.regexp
+package com.reevajs.regexp.compiler
 
 import java.nio.ByteBuffer
 
