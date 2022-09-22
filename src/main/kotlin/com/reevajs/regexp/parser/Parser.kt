@@ -449,7 +449,7 @@ class Parser(private val codePoints: IntArray, private val unicode: Boolean) {
 
         while (cursor + numChars <= codePoints.lastIndex && numChars < max) {
             val digitValue = codePointToInt(codePoints[cursor + numChars], base) ?: break
-            value = (value shl 4) or digitValue
+            value = (value * base) or digitValue
             numChars++
         }
 
