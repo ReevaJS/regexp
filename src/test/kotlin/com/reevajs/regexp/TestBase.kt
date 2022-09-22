@@ -1,7 +1,7 @@
 package com.reevajs.regexp
 
 import com.reevajs.regexp.parser.Parser
-import com.reevajs.regexp.parser.RegexSyntaxError
+import com.reevajs.regexp.parser.RegExpSyntaxError
 import org.intellij.lang.annotations.Language
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.MethodSource
@@ -43,7 +43,7 @@ abstract class TestBase {
     }
 
     protected fun testDoesNotCompile(@Language("regexp") regexp: String, vararg flags: RegExp.Flag) {
-        expectThrows<RegexSyntaxError> { RegExp(regexp, *flags) }
+        expectThrows<RegExpSyntaxError> { RegExp(regexp, *flags) }
     }
 
     protected fun testCompiles(@Language("regexp") regexp: String, vararg flags: RegExp.Flag) {

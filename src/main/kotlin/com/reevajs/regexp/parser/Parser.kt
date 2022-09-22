@@ -504,7 +504,7 @@ class Parser(private val codePoints: IntArray, private val unicode: Boolean) {
 
     private fun peek(n: Int): Int? = codePoints.getOrNull(cursor + n)
 
-    private fun error(message: String): Nothing = throw RegexSyntaxError(message, cursor)
+    private fun error(message: String): Nothing = throw RegExpSyntaxError(message, cursor)
 
     private operator fun ASTNode.unaryPlus() {
         nodeBuffers.last().add(this)
