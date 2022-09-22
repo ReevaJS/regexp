@@ -375,7 +375,7 @@ class Parser(private val codePoints: IntArray, private val unicode: Boolean) {
                     +CodePointNode('k'.code)
                 }
             }
-            else -> +CodePointNode(codePoint)
+            else -> +CodePointNode(codePoint).also { cursor++ }
         }
     }
 
