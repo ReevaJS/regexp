@@ -265,6 +265,10 @@ class Parser(private val codePoints: IntArray, private val unicode: Boolean) {
             error("RegExp cannot end with a backslash")
 
         when (codePoint) {
+            '0'.code -> {
+                cursor++
+                +CodePointNode(0)
+            }
             't'.code -> {
                 cursor++
                 +CodePointNode('\t'.code)
