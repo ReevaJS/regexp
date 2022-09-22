@@ -124,6 +124,26 @@ class Matcher(
                     ExecResult.Continue
                 } else ExecResult.Fail
             }
+            CODEPOINT1_LIST_OP -> {
+                val length = readByte().toInt()
+                if (state.sourceCursor + length > source.size)
+                    return ExecResult.Fail
+
+                val codePoints = readBytes(length)
+                val result = run {
+                    for ((index, codePoint) in codePoints.withIndex()) {
+                        if (codePoint.toInt() != source[sourceCursor + index])
+                            return@run false    
+                    }
+
+                    true
+                }
+
+                if (checkCondition(result)) {
+                    advanceSource(length)
+                    ExecResult.Continue
+                } else ExecResult.Fail
+            }
             START_OP -> {
                 if (checkCondition(sourceCursor == 0)) {
                     ExecResult.Continue

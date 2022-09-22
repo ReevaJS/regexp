@@ -1,7 +1,7 @@
 package com.reevajs.regexp
 
-import com.reevajs.regexp.parsing.ASTPrinter
-import com.reevajs.regexp.parsing.Parser
+import com.reevajs.regexp.parser.ASTPrinter
+import com.reevajs.regexp.parser.Parser
 
 @Suppress("unused", "MemberVisibilityCanBePrivate")
 class RegExp(

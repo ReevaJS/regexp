@@ -1,6 +1,6 @@
 package com.reevajs.regexp
 
-import com.reevajs.regexp.parsing.*
+import com.reevajs.regexp.parser.*
 
 class Compiler(private val root: RootNode) {
     private val buffer = GrowableByteBuffer()
@@ -35,6 +35,11 @@ class Compiler(private val root: RootNode) {
                     writeByte(CODEPOINT4_OP)
                     writeInt(node.codePoint)
                 }
+            }
+            is CodePointListNode -> {
+                writeByte(CODEPOINT1_LIST_OP)
+                writeByte(node.codePoints.size.toByte())
+                node.codePoints.forEach(::writeByte)
             }
             is StartNode -> writeByte(START_OP)
             is EndNode -> writeByte(END_OP)

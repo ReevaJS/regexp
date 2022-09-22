@@ -1,4 +1,4 @@
-package com.reevajs.regexp.parsing
+package com.reevajs.regexp.parser
 
 class ASTPrinter(private var indent: Int = 0) {
     fun print(node: ASTNode) {
@@ -17,6 +17,11 @@ class ASTPrinter(private var indent: Int = 0) {
                 } else {
                     println(" 0x${node.codePoint.toString(radix = 16)}")
                 }
+            }
+            is CodePointListNode -> {
+                for (cp in node.codePoints)
+                    print(" $cp")
+                println()
             }
             is NegateNode -> {
                 println()

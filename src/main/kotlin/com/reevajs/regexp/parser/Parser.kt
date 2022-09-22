@@ -1,4 +1,4 @@
-package com.reevajs.regexp.parsing
+package com.reevajs.regexp.parser
 
 import com.reevajs.regexp.*
 
@@ -29,9 +29,11 @@ class Parser(private val codePoints: IntArray, private val unicode: Boolean) {
             ref.index = namedGroups.entries.first { it.value == name }.key
         }
 
-        return RootNode(namedGroups, nextGroupIndex, popNodeBuffer() + MatchNode).also {
+        val ast = RootNode(namedGroups, nextGroupIndex, popNodeBuffer() + MatchNode).also {
             expect(nodeBuffers.isEmpty())
         }
+
+        return Optimizer.optimize(ast)
     }
 
     private fun parseSingle() {

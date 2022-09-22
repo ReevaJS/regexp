@@ -1,4 +1,4 @@
-package com.reevajs.regexp.parsing
+package com.reevajs.regexp.parser
 
 sealed class ASTNode {
     open fun asReversed() = this
@@ -13,6 +13,8 @@ data class GroupNode(val index: Short?, val nodes: List<ASTNode>) : ASTNode() {
 }
 
 data class CodePointNode(val codePoint: Int) : ASTNode()
+
+data class CodePointListNode(val codePoints: ByteArray) : ASTNode()
 
 data class NegateNode(val node: ASTNode) : ASTNode() {
     override fun asReversed() = NegateNode(node.asReversed())

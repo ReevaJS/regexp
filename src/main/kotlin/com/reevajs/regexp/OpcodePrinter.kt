@@ -20,6 +20,14 @@ class OpcodePrinter(private val opcodes: Opcodes, private val indent: Int = 0) {
                 CODEPOINT1_OP -> println("CODEPOINT1 ${bytes.get().toInt().toChar()}")
                 CODEPOINT2_OP -> println("CODEPOINT2 ${bytes.short.toInt().toChar()}")
                 CODEPOINT4_OP -> println("CODEPOINT4 ${bytes.int}")
+                CODEPOINT1_LIST_OP -> {
+                    print("CODEPOINT1_LIST ")
+                    val length = bytes.get()
+                    (0 until length).forEach {
+                        print("${bytes.get().toInt().toChar()} ")
+                    }
+                    println()
+                }
                 START_OP -> println("START")
                 END_OP -> println("END")
                 ANY_OP -> println("ANY")
