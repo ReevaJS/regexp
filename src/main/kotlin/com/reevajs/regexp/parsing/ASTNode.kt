@@ -1,4 +1,4 @@
-package com.reevajs.regexp
+package com.reevajs.regexp.parsing
 
 sealed class ASTNode {
     open fun asReversed() = this

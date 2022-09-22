@@ -1,5 +1,7 @@
 package com.reevajs.regexp
 
+import com.reevajs.regexp.parsing.Parser
+import com.reevajs.regexp.parsing.RegexSyntaxError
 import org.intellij.lang.annotations.Language
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.MethodSource

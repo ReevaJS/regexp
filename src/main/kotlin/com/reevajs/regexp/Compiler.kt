@@ -1,5 +1,7 @@
 package com.reevajs.regexp
 
+import com.reevajs.regexp.parsing.*
+
 class Compiler(private val root: RootNode) {
     private val buffer = GrowableByteBuffer()
 
