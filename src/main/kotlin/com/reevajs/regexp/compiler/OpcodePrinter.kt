@@ -15,7 +15,7 @@ class OpcodePrinter(private val opcodes: Opcodes, private val indent: Int = 0) {
             print("${" ".repeat(indent)}%${lenWidth}d: ".format(bytes.position()))
 
             when (val op = bytes.get()) {
-                START_GROUP_OP -> println("START_GROUP ${bytes.short}")
+                START_GROUP_OP -> println("START_GROUP #${bytes.short}")
                 START_NON_CAPTURING_GROUP_OP -> println("START_NON_CAPTURING_GROUP")
                 END_GROUP_OP -> println("END_GROUP")
                 CODEPOINT1_OP -> println("CODEPOINT1 ${bytes.get().toInt().toChar()}")
@@ -50,7 +50,7 @@ class OpcodePrinter(private val opcodes: Opcodes, private val indent: Int = 0) {
                 BACK_REFERENCE_OP -> {
                     val index = bytes.short
                     val name = opcodes.groupNames[index]
-                    print("BACK_REFERENCE $index")
+                    print("BACK_REFERENCE #$index")
                     if (name != null) {
                         println(" ($name)")
                     } else {
@@ -65,6 +65,10 @@ class OpcodePrinter(private val opcodes: Opcodes, private val indent: Int = 0) {
                 FORK_OP -> println("FORK ${bytes.position() + bytes.short}")
                 FORK_NOW_OP -> println("FORK_NOW ${bytes.position() + bytes.short}")
                 JUMP_OP -> println("JUMP ${bytes.position() + bytes.short}")
+                SAVE_POS_OP -> println("SAVE_POS ${bytes.short}")
+                REPEAT_FORK_OP -> println("REPEAT_FORK ${bytes.position() + bytes.short} #${bytes.short}")
+                REPEAT_FORK_NOW_OP -> println("REPEAT_FORK_NOW ${bytes.position() + bytes.short} #${bytes.short}")
+                REPEAT_JUMP_OP -> println("REPEAT_JUMP ${bytes.position() + bytes.short} #${bytes.short}")
                 RANGE_JUMP_OP -> println("RANGE_CHECK ${bytes.short}..${bytes.short} below=${bytes.position() + bytes.short} above=${bytes.position() + bytes.short}")
                 in POSITIVE_LOOKAHEAD_OP..NEGATIVE_LOOKBEHIND_OP -> {
                     val numOpcodes = bytes.short.toInt()
@@ -72,13 +76,15 @@ class OpcodePrinter(private val opcodes: Opcodes, private val indent: Int = 0) {
                     bytes.get(array)
                     i += numOpcodes
 
-                    print(when (op) {
-                        POSITIVE_LOOKAHEAD_OP -> "POSITIVE_LOOKAHEAD"
-                        POSITIVE_LOOKBEHIND_OP -> "POSITIVE_LOOKBEHIND"
-                        NEGATIVE_LOOKAHEAD_OP -> "NEGATIVE_LOOKAHEAD"
-                        NEGATIVE_LOOKBEHIND_OP -> "NEGATIVE_LOOKBEHIND"
-                        else -> unreachable()
-                    })
+                    print(
+                        when (op) {
+                            POSITIVE_LOOKAHEAD_OP -> "POSITIVE_LOOKAHEAD"
+                            POSITIVE_LOOKBEHIND_OP -> "POSITIVE_LOOKBEHIND"
+                            NEGATIVE_LOOKAHEAD_OP -> "NEGATIVE_LOOKAHEAD"
+                            NEGATIVE_LOOKBEHIND_OP -> "NEGATIVE_LOOKBEHIND"
+                            else -> unreachable()
+                        }
+                    )
 
                     println(" $numOpcodes")
 

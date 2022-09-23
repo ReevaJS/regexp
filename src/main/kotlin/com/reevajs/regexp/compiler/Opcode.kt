@@ -133,38 +133,77 @@ const val FORK_NOW_OP: Byte = 25
 const val JUMP_OP: Byte = 26
 
 /**
+ * Saves the current position for a later REPEAT op to ensure we do not loop if our target
+ * opcodes matched an empty string.
+ *
+ * SAVE_POS_OP
+ * index: SHORT
+ */
+const val SAVE_POS_OP: Byte = 27
+
+/**
+ * Like FORK_OP, but only forks if the current position is different from the one associated
+ * with index.
+ *
+ * REPEAT_FORK_OP
+ * offset: SHORT
+ * index: SHORT
+ */
+const val REPEAT_FORK_OP: Byte = 28
+
+/**
+ * Like FORK_NOW_OP, but only forks if the current position is different from the one associated
+ * with index.
+ *
+ * REPEAT_FORK_NOW_OP
+ * offset: SHORT
+ * index: SHORT
+ */
+const val REPEAT_FORK_NOW_OP: Byte = 29
+
+/**
+ * Like JUMP_OP, but only jumps if the current position is different from the one associated
+ * with index.
+ *
+ * REPEAT_FORK_NOW_OP
+ * offset: SHORT
+ * index: SHORT
+ */
+const val REPEAT_JUMP_OP: Byte = 30
+
+/**
  * RANGE_JUMP_OP
  * min: SHORT
  * max: SHORT
  * below offset: SHORT
  * above offset: SHORT
  */
-const val RANGE_JUMP_OP: Byte = 27
+const val RANGE_JUMP_OP: Byte = 31
 
 /**
  * POSITIVE_LOOKAHEAD_OP
  * num opcodes: SHORT
  * <num opcodes>
  */
-const val POSITIVE_LOOKAHEAD_OP: Byte = 28
+const val POSITIVE_LOOKAHEAD_OP: Byte = 32
 
 /**
  * POSITIVE_LOOKBEHIND_OP
  * num opcodes: SHORT
  * <num opcodes>
  */
-const val POSITIVE_LOOKBEHIND_OP: Byte = 29
+const val POSITIVE_LOOKBEHIND_OP: Byte = 33
 
 /**
  * NEGATIVE_LOOKAHEAD_OP
  * num opcodes: SHORT
  * <num opcodes>
  */
-const val NEGATIVE_LOOKAHEAD_OP: Byte = 30
+const val NEGATIVE_LOOKAHEAD_OP: Byte = 34
 
 /**
  * NEGATIVE_LOOKBEHIND_OP
  * num opcodes: SHORT
  * <num opcodes>
  */
-const val NEGATIVE_LOOKBEHIND_OP: Byte = 31
+const val NEGATIVE_LOOKBEHIND_OP: Byte = 35

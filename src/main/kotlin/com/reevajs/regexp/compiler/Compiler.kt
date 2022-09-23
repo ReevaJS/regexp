@@ -6,6 +6,7 @@ import com.reevajs.regexp.unreachable
 
 class Compiler(private val root: RootNode) {
     private val buffer = GrowableByteBuffer()
+    private var nextRepeatIndex: Short = 0
 
     fun compile(): ByteArray {
         compileNode(root)
@@ -121,13 +122,16 @@ class Compiler(private val root: RootNode) {
                 /*
                  * FORK/FORK_NOW _END
                  * _BYTES:
+                 * SAVE_POS X
                  * <X bytes>
-                 * FORK_NOW/FORK _BYTES
+                 * REPEAT_FORK_NOW/REPEAT_FORK _BYTES X
                  * _END:
                  */
 
+                val repeatIndex = nextRepeatIndex++
+
                 val firstOp = if (node.lazy) FORK_NOW_OP else FORK_OP
-                val secondOp = if (node.lazy) FORK_OP else FORK_NOW_OP
+                val secondOp = if (node.lazy) REPEAT_FORK_OP else REPEAT_FORK_NOW_OP
 
                 val bytesLabel = Label()
                 val endLabel = Label()
@@ -135,22 +139,32 @@ class Compiler(private val root: RootNode) {
                 writeJump(firstOp, endLabel)
                 placeLabel(bytesLabel)
 
+                writeByte(SAVE_POS_OP)
+                writeShort(repeatIndex)
+
                 compileNode(node.node)
 
                 writeJump(secondOp, bytesLabel)
+                writeShort(repeatIndex)
                 placeLabel(endLabel)
             }
             is OneOrMoreNode -> {
                 /*
                  * _BYTES:
+                 * SAVE_POS X
                  * <X bytes>
-                 * FORK/FORK_NOW _BYTES
+                 * REPEAT_FORK/REPEAT_FORK_NOW _BYTES X
                  */
+
+                val repeatIndex = nextRepeatIndex++
 
                 val label = Label()
                 placeLabel(label)
+                writeByte(SAVE_POS_OP)
+                writeShort(repeatIndex)
                 compileNode(node.node)
-                writeJump(if (node.lazy) FORK_OP else FORK_NOW_OP, label)
+                writeJump(if (node.lazy) REPEAT_FORK_OP else REPEAT_FORK_NOW_OP, label)
+                writeShort(repeatIndex)
             }
             is RepetitionNode -> {
                 if (node.min == 0.toShort() && node.max == 0.toShort())
@@ -166,10 +180,13 @@ class Compiler(private val root: RootNode) {
                  * RANGE_JUMP MIN MAX _BYTES _END
                  * FORK/FORK_NOW _END
                  * _BYTES:
+                 * SAVE_POS X
                  * <X bytes>
-                 * JUMP _START
+                 * REPEAT_JUMP _START X
                  * _END:
                  */
+
+                val repeatIndex = nextRepeatIndex++
 
                 val startLabel = Label()
                 val bytesLabel = Label()
@@ -185,8 +202,11 @@ class Compiler(private val root: RootNode) {
                 writeJump(if (node.lazy) FORK_NOW_OP else FORK_OP, endLabel)
                 placeLabel(bytesLabel)
 
+                writeByte(SAVE_POS_OP)
+                writeShort(repeatIndex)
                 compileNode(node.node)
-                writeJump(JUMP_OP, startLabel)
+                writeJump(REPEAT_JUMP_OP, startLabel)
+                writeShort(repeatIndex)
 
                 placeLabel(endLabel)
             }

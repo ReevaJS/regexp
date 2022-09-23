@@ -17,6 +17,7 @@ class Matcher(
     private val pendingStates = mutableListOf<MatchState>()
     private var negateNext = false
     private val rangeCounts = mutableMapOf<Int, Int>()
+    private val savedPositions = mutableMapOf<Short, Int>()
 
     private val dotMatchesNewlines = RegExp.Flag.DotMatchesNewlines in flags
     private val unicode = RegExp.Flag.Unicode in flags
@@ -42,6 +43,8 @@ class Matcher(
     fun match(startIndex: Int = 0): MatchResult? {
         pendingStates.clear()
         rangeCounts.clear()
+        savedPositions.clear()
+
         return exec(MatchState(startIndex, 0))
     }
 
@@ -324,6 +327,37 @@ class Matcher(
             }
             JUMP_OP -> {
                 opcodeCursor += readShort()
+                ExecResult.Continue
+            }
+            SAVE_POS_OP -> {
+                savedPositions[readShort()] = sourceCursor
+                ExecResult.Continue
+            }
+            REPEAT_FORK_OP -> {
+                val offset = readShort() - 2
+                val index = readShort()
+                if (sourceCursor > savedPositions[index]!!) {
+                    val newState = state.copy()
+                    newState.opcodeCursor += offset - 2 // account for index
+                    pendingStates.add(newState)
+                }
+                ExecResult.Continue
+            }
+            REPEAT_FORK_NOW_OP -> {
+                val offset = readShort() - 2
+                val index = readShort()
+                if (sourceCursor > savedPositions[index]!!) {
+                    val newState = state.copy()
+                    pendingStates.add(newState)
+                    opcodeCursor += offset - 2 // account for index
+                }
+                ExecResult.Continue
+            }
+            REPEAT_JUMP_OP -> {
+                val offset = readShort() - 2
+                val index = readShort()
+                if (sourceCursor > savedPositions[index]!!)
+                    opcodeCursor += offset - 2 // account for index
                 ExecResult.Continue
             }
             RANGE_JUMP_OP -> {

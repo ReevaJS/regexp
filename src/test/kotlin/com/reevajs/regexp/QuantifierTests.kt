@@ -24,4 +24,18 @@ class QuantifierTests : TestBase() {
                 testDoesNotCompile(target + quantifier)
         }
     }
+
+    @Test
+    fun `test unbounded empty basic quantifier match does not infinitely loop`() = testMatches("(?:)*", "ab") {
+        match { this[0] = "" spanned IntRange(0, -1) }
+        match { this[0] = "" spanned IntRange(1, 0) }
+        match { this[0] = "" spanned IntRange(2, 1) }
+    }
+
+    @Test
+    fun `test unbounded empty repetition quantifier match does not infinitely loop`() = testMatches("(?:){0,}", "ab") {
+        match { this[0] = "" spanned IntRange(0, -1) }
+        match { this[0] = "" spanned IntRange(1, 0) }
+        match { this[0] = "" spanned IntRange(2, 1) }
+    }
 }
