@@ -370,7 +370,7 @@ class Parser(private val codePoints: IntArray, private val unicode: Boolean) {
                     unicodePropertyAliasList[name]!! + "=" + unicodeValueAliasesList[value]!!
                 } else unicodeValueAliasesList[value]!!
 
-                +UnicodeClassNode(normalizedText).also {
+                UnicodeClassNode(normalizedText).also {
                     if (shouldNegate) +NegateNode(it) else +it
                 }
             }
