@@ -215,7 +215,7 @@ class Parser(private val codePoints: IntArray, private val unicode: Boolean) {
             }
             '{'.code -> {
                 cursor++
-                val start = codePoint
+                val start = cursor
 
                 fun incomplete(): Boolean {
                     cursor = start
