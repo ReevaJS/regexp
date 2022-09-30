@@ -347,7 +347,7 @@ class Parser(private val codePoints: IntArray, private val unicode: Boolean) {
                 } ?: 'x'.code
                 +CodePointNode(value)
             }
-            'p'.code, 'P'.code -> {
+            'p'.code, 'P'.code -> if (unicode) {
                 val shouldNegate = codePoint == 'P'.code
 
                 cursor++
@@ -373,6 +373,8 @@ class Parser(private val codePoints: IntArray, private val unicode: Boolean) {
                 UnicodeClassNode(normalizedText).also {
                     if (shouldNegate) +NegateNode(it) else +it
                 }
+            } else {
+                +CodePointNode(codePoint).also { cursor++ }
             }
             'k'.code -> {
                 if (inCharClass)
