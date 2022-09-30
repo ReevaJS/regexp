@@ -58,7 +58,7 @@ class Parser(private val codePoints: IntArray, private val unicode: Boolean) {
                     consumeIf('?'.code, '<'.code, '='.code) -> "?<="
                     consumeIf('?'.code, '<'.code, '!'.code) -> "?<!"
                     consumeIf('?'.code, '<'.code) -> {
-                        val name = parseName(endDelimiter = '>'.code)
+                        val name = parseName(endDelimiter = '>'.code, isUnicodeClass = false)
                         if (!groupNames.add(name))
                             error("Duplicate capturing group name \"$name\"")
 
@@ -354,12 +354,23 @@ class Parser(private val codePoints: IntArray, private val unicode: Boolean) {
                 if (!consumeIf('{'.code))
                     error("Expected '{'")
 
-                val text = parseName(endDelimiter = '}'.code)
+                val text = parseName(endDelimiter = '}'.code, isUnicodeClass = true)
 
-                if (text !in unicodePropertyAliasList && text !in unicodeValueAliasesList)
-                    error("Unknown unicode property or category \"$text\"")
+                val (name, value) = if ('=' in text) {
+                    text.split('=')
+                } else listOf(null, text)
 
-                +UnicodeClassNode(text).also {
+                if (name != null && name !in unicodePropertyAliasList)
+                    error("Unknown unicode property \"$name\"")
+
+                if (value !in unicodeValueAliasesList)
+                    error("Unknown unicode value \"$value\"")
+
+                val normalizedText = if (name != null) {
+                    unicodePropertyAliasList[name]!! + "=" + unicodeValueAliasesList[value]!!
+                } else unicodeValueAliasesList[value]!!
+
+                +UnicodeClassNode(normalizedText).also {
                     if (shouldNegate) +NegateNode(it) else +it
                 }
             }
@@ -369,7 +380,7 @@ class Parser(private val codePoints: IntArray, private val unicode: Boolean) {
 
                 cursor++
                 if (consumeIf('<'.code)) {
-                    val name = parseName(endDelimiter = '>'.code)
+                    val name = parseName(endDelimiter = '>'.code, isUnicodeClass = false)
                     // No need to bother checking if this exists here, just assume it doesn't and
                     // resolve all named back references at the end
                     val node = BackReferenceNode(Short.MIN_VALUE)
@@ -459,7 +470,7 @@ class Parser(private val codePoints: IntArray, private val unicode: Boolean) {
         return NumberInfo(codePoints.copyOfRange(cursor, cursor + numChars), value)
     }
 
-    private fun parseName(endDelimiter: Int): String {
+    private fun parseName(endDelimiter: Int, isUnicodeClass: Boolean): String {
         val start = cursor
         val name = consumeUntil(endDelimiter) ?: error("Expected valid name")
 
@@ -469,7 +480,7 @@ class Parser(private val codePoints: IntArray, private val unicode: Boolean) {
         cursor++
 
         name.forEachIndexed { index, ch ->
-            if (!isWordCodepoint(ch)) {
+            if (!isWordCodepoint(ch) && !(isUnicodeClass && ch == '='.code)) {
                 cursor = start + index
                 error("Invalid character '${ch.toChar()}' in name")
             }
